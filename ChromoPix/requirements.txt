@@ -1,0 +1,15 @@
+torch>=2.0
+numpy
+scikit-image
+scipy
+opencv-python-headless
+tqdm
+scikit-learn
+Pillow
+tifffile
+torchvision
+matplotlib
+wandb
+# Optional
+# umap-learn
+# cellpose  # for 3D CPSAM segmentation

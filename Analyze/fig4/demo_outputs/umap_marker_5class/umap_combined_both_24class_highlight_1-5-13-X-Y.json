@@ -1,0 +1,25 @@
+{
+  "schema_version": "chromoworld.fig4.umap_marker_demo.v1",
+  "project": "Chromo World",
+  "source_render": "umap_24class/umap_combined_both_24class.png and .svg",
+  "space": "combined",
+  "split": "both",
+  "highlight_classes": [
+    "1",
+    "5",
+    "13",
+    "X",
+    "Y"
+  ],
+  "highlight_class_ids": [
+    0,
+    4,
+    12,
+    22,
+    23
+  ],
+  "other_classes": "gray context",
+  "note": "Derived from the saved combined UMAP render; the plotting script also supports direct --highlight-classes rendering from NPZ.",
+  "output_png": "umap_combined_both_24class_highlight_1-5-13-X-Y.png",
+  "output_svg": "umap_combined_both_24class_highlight_1-5-13-X-Y.svg"
+}
