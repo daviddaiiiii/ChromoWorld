@@ -1,5 +1,7 @@
 # ChromoWorld
 
+Official Repository of Project ChromoWorld.
+
 Code accompanying the ChromoWorld project.
 
 ## Contents
