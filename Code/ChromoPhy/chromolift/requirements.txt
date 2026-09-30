@@ -1,0 +1,11 @@
+torch>=2.0
+numpy
+scipy
+pandas
+scikit-learn==1.7.1
+matplotlib
+seaborn
+tqdm
+Pillow
+umap-learn
+flow_matching

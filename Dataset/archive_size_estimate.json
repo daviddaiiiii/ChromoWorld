@@ -1,0 +1,59 @@
+{
+  "method": "stratified sampled USTAR + gzip level 6; estimate, not a full archive",
+  "seed": 0,
+  "sample_budget_per_stratum_bytes": 134217728,
+  "strata": [
+    {
+      "split": "test",
+      "extension": ".png",
+      "files": 2945,
+      "logical_bytes": 959793965,
+      "sample_files": 414,
+      "sample_logical_bytes": 134300820,
+      "sample_tar_gzip_ratio": 0.8189228352951243,
+      "estimated_archive_bytes": 787854816
+    },
+    {
+      "split": "test",
+      "extension": ".txt",
+      "files": 2945,
+      "logical_bytes": 118626451,
+      "sample_files": 2945,
+      "sample_logical_bytes": 118626451,
+      "sample_tar_gzip_ratio": 0.21844538462963747,
+      "estimated_archive_bytes": 26407719
+    },
+    {
+      "split": "train",
+      "extension": ".png",
+      "files": 10735,
+      "logical_bytes": 3365200448,
+      "sample_files": 425,
+      "sample_logical_bytes": 134258192,
+      "sample_tar_gzip_ratio": 0.7978403213324521,
+      "estimated_archive_bytes": 2691484427
+    },
+    {
+      "split": "train",
+      "extension": ".txt",
+      "files": 10735,
+      "logical_bytes": 446538296,
+      "sample_files": 3193,
+      "sample_logical_bytes": 134309909,
+      "sample_tar_gzip_ratio": 0.21839487373418315,
+      "estimated_archive_bytes": 99320258
+    }
+  ],
+  "logical_bytes": 4890159160,
+  "estimated_archive_bytes": 3605067220,
+  "planning_range_bytes": [
+    3424813859,
+    3785320581
+  ],
+  "existing_3d_archives": [
+    {
+      "file": "DAPI_Tag_matched_1333pairs.tar.gz",
+      "bytes": 37556932777
+    }
+  ]
+}

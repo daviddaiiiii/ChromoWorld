@@ -1,0 +1,10 @@
+epoch,n_test_samples,miou_t0,miou_mean,count_err_t0,count_err_mean,test_vis_dir
+5,2,0.1465451067355687,0.3099884941971659,42.5,31.069565217391307,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0005
+10,2,0.1866027995273285,0.3197394907409099,43.0,30.46215161649944,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0010
+15,2,0.2561495760120493,0.3350042675142154,68.0,37.72798216276477,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0015
+20,2,0.19231099388236345,0.3408649386769621,70.5,42.013377926421406,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0020
+25,2,0.19525711585910846,0.31864852562412826,62.0,40.582943143812706,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0025
+30,2,0.1817147986565223,0.35534007025629466,72.0,39.61711259754738,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0030
+35,2,0.23354481317613152,0.36395983137547977,62.0,34.49052396878484,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0035
+40,2,0.18410121536632978,0.3636974454807588,63.5,37.20551839464883,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0040
+45,2,0.18555757774140874,0.3538296951130553,68.0,36.50468227424749,/share/project/daigaole/code/dinov3/chromosome/chromopose3D/outputs/chromopose_20260703_203720/test_vis/epoch_0045

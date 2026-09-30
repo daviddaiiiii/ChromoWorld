@@ -1,0 +1,80 @@
+{
+  "input": "/share/project/daigaole/data/OpenChromo/instance/analyze/instance_2d_filtered.jsonl",
+  "n_total": 711541,
+  "n_banding": 483738,
+  "n_fish": 227803,
+  "n_gt": 267790,
+  "n_pred": 443751,
+  "protocol": "separate UMAP per modality; color by pred/GT/both within each space",
+  "features": [
+    "norm_size",
+    "eccentricity",
+    "solidity",
+    "circularity",
+    "tortuosity"
+  ],
+  "spaces": {
+    "banding": {
+      "n": 483738,
+      "umap_fit_samples": 79992,
+      "title": "Banding"
+    },
+    "fish": {
+      "n": 227803,
+      "umap_fit_samples": 76950,
+      "title": "FISH"
+    },
+    "combined": {
+      "n": 711541,
+      "umap_fit_samples": 79992,
+      "title": "Banding & FISH"
+    }
+  },
+  "combos": {
+    "banding_pred": {
+      "n_subset": 237423,
+      "n_plotted": 98646,
+      "n_gray_bg": 60000
+    },
+    "banding_gt": {
+      "n_subset": 246315,
+      "n_plotted": 98676,
+      "n_gray_bg": 60000
+    },
+    "banding_both": {
+      "n_subset": 483738,
+      "n_plotted": 99984,
+      "n_gray_bg": 0
+    },
+    "fish_pred": {
+      "n_subset": 206328,
+      "n_plotted": 95968,
+      "n_gray_bg": 21475
+    },
+    "fish_gt": {
+      "n_subset": 21475,
+      "n_plotted": 21475,
+      "n_gray_bg": 60000
+    },
+    "fish_both": {
+      "n_subset": 227803,
+      "n_plotted": 96109,
+      "n_gray_bg": 0
+    },
+    "combined_pred": {
+      "n_subset": 443751,
+      "n_plotted": 98796,
+      "n_gray_bg": 60000
+    },
+    "combined_gt": {
+      "n_subset": 267790,
+      "n_plotted": 98817,
+      "n_gray_bg": 60000
+    },
+    "combined_both": {
+      "n_subset": 711541,
+      "n_plotted": 99984,
+      "n_gray_bg": 0
+    }
+  }
+}

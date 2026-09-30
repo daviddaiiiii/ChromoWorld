@@ -1,15 +1,29 @@
-# macOS and Python-generated files
+# Generated files, environments, and secrets
 .DS_Store
 __pycache__/
 *.py[cod]
-
-# Local environments and secrets
 .venv/
 venv/
 .env
 .env.*
-
-# Runtime logs and editor state
 *.log
 .idea/
 .vscode/
+
+# Large datasets and model weights are distributed outside GitHub.
+Dataset/**
+!Dataset/**/
+!Dataset/*.md
+!Dataset/estimate_archive_size.py
+!Dataset/archive_size_estimate.json
+Checkpoint/**
+!Checkpoint/**/
+!Checkpoint/**/*.md
+!Checkpoint/**/training_run/
+!Checkpoint/**/training_run/args.json
+!Checkpoint/**/training_run/train.csv
+!Checkpoint/**/training_run/test.csv
+
+# Local training and evaluation products, not curated figure demos.
+Code/**/outputs/
+Code/Analyze/results/

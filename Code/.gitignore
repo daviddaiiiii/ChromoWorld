@@ -1,0 +1,20 @@
+# macOS and Python-generated files
+.DS_Store
+__pycache__/
+*.py[cod]
+
+# Local environments and secrets
+.venv/
+venv/
+.env
+.env.*
+
+# Runtime logs and editor state
+*.log
+.idea/
+.vscode/
+
+# Model/runtime outputs; keep curated figure demos and UMAP assets.
+**/outputs/
+Analyze/results/
+ChromoPhy/chromopose/segmentation/dataset

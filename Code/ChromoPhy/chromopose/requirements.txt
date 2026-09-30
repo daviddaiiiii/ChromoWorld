@@ -1,0 +1,10 @@
+torch>=2.0
+numpy
+scipy
+scikit-image
+tifffile
+opencv-python-headless
+matplotlib
+Pillow
+tqdm
+cellpose>=4,<5
