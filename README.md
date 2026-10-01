@@ -61,7 +61,7 @@ provides the code and plotting assets for this stage.
 
 ### ChromoLift and ChromoID: lifting morphology and retrieving identity
 
-**ChromoLift** maps seven-dimensional 2D physical descriptors into 3D feature
+**ChromoLift** maps 2D physical descriptors into 3D feature
 space, optionally conditioned on image features. It connects labeled
 fixed-cell morphology with the descriptor space of live-cell chromosome
 instances. **ChromoID** then assigns candidate identities by retrieving
@@ -152,7 +152,7 @@ ChromoID pin scikit-learn 1.7.1 for checkpoint scaler compatibility.
 | --- | --- | --- |
 | ChromoPix | DINOv3-based 24-class 2D segmentation | [Train / infer / evaluate](Code/ChromoPix/README.md) |
 | ChromoPose | 3D U-Net with maintained two-phase flow decoding | [Train / infer / evaluate](Code/ChromoPhy/chromopose/segmentation/README.md) |
-| ChromoLift | Seven-feature 2D-to-3D flow matching | [Train / infer / evaluate](Code/ChromoPhy/chromolift/README.md) |
+| ChromoLift | 2D-to-3D flow matching | [Train / infer / evaluate](Code/ChromoPhy/chromolift/README.md) |
 | ChromoID | Standardized, distance-weighted kNN retrieval | [Build gallery / infer / evaluate](Code/ChromoPhy/chromoid/README.md) |
 
 ```text
