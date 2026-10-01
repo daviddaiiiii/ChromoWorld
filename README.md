@@ -6,7 +6,7 @@
 
 **ChromoPix** · **ChromoPose** · **ChromoLift** · **ChromoID**
 
-[Quick start](#quick-start) · [Figure gallery](#figure-gallery) · [Model training](Code/README.md) · [Data and weights](#data-and-weights)
+[Research story](#research-story) · [Quick start](#quick-start) · [Model training](Code/README.md) · [Data and weights](#data-and-weights)
 
 </div>
 
@@ -16,10 +16,85 @@ identity predictions. ChromoPose segments live-cell volumes. ChromoLift maps
 2D descriptors into 3D feature space, and ChromoID retrieves chromosome
 identities from a labeled reference gallery.
 
-![ChromoWorld research overview from the project presentation](docs/images/overview.png)
+![ChromoWorld overview: fixed-cell identity learning and live-cell morphology-based retrieval](docs/images/overview.png)
 
-<sub>Research overview from the project presentation, slide 1. The reproduction
-status below describes the assets currently released.</sub>
+## Research story
+
+### ChromoPix: pixel-level chromosome identity
+
+ChromoPix learns chromosome identity from Banding and FISH images using
+mixed supervision and invariant feature learning. It predicts a 24-class
+chromosome map, extending sparse FISH identity clues into a virtual m-FISH
+view of the processed image.
+
+![ChromoPix: sparse FISH clues, human annotations and 24-class predictions](docs/images/chromopix.png)
+
+The two demos below each contain five samples with **input / GT / prediction**.
+The shared 24-color palette represents chromosome classes. Sparse or
+unlabelled FISH GT should not be read as complete 24-class ground truth.
+
+<table>
+<tr><th>Banding</th><th>FISH</th></tr>
+<tr>
+<td><img src="Code/Analyze/fig2-3/demo_outputs/Banding_5x3.png" width="440" alt="Five Banding samples: input, GT, prediction"></td>
+<td><img src="Code/Analyze/fig2-3/demo_outputs/FISH_5x3.png" width="440" alt="Five FISH samples: input, GT, prediction"></td>
+</tr>
+</table>
+
+[ChromoPix model guide](Code/ChromoPix/README.md) ·
+[Fig2–3 predictions, metrics and demos](Code/Analyze/fig2-3/README.md)
+
+### ChromoPhy: a stable chromosome morphology alphabet
+
+We identify a stable **chromosome morphology alphabet** across dehydrated
+Banding and rehydrated FISH states. Size, eccentricity, solidity, circularity
+and tortuosity organize chromosome identities into a consistent morphology
+manifold despite changes in preparation and appearance. This cross-state
+organization motivates morphology-based identity transfer to hydrated,
+live-cell chromosomes.
+
+![Chromosome morphology alphabet: Banding and FISH manifolds, physical descriptors and cross-state correspondence](docs/images/morphology-alphabet.png)
+
+The retained fixed-cell assets contain 711,541 combined Banding/FISH rows.
+[Fig4 descriptor extraction, QC and saved UMAP reproduction](Code/Analyze/fig4/README.md)
+provides the code and plotting assets for this stage.
+
+### ChromoLift and ChromoID: lifting morphology and retrieving identity
+
+**ChromoLift** maps seven-dimensional 2D physical descriptors into 3D feature
+space, optionally conditioned on image features. It connects labeled
+fixed-cell morphology with the descriptor space of live-cell chromosome
+instances. **ChromoID** then assigns candidate identities by retrieving
+neighbors from the lifted, labeled reference gallery using the fitted 3D
+standardization and distance-weighted kNN.
+
+![ChromoLift connects morphology spaces and ChromoID retrieves chromosome identities in the live-cell manifold](docs/images/chromolift-chromoid.png)
+
+These assignments are model-inferred identities. Manifold agreement and
+embedding colors alone do not establish experimentally verified chromosome
+identity for every live-cell instance.
+
+[ChromoLift training and inference](Code/ChromoPhy/chromolift/README.md) ·
+[ChromoID gallery and retrieval](Code/ChromoPhy/chromoid/README.md) ·
+[Fig5 3D and lifted UMAP assets](Code/Analyze/fig5/README.md)
+
+### ChromoPose: live-cell chromosome instance segmentation
+
+ChromoPose provides instance masks for live-cell 3D volumes and 4D movies.
+The figure shows preprocessing and qualitative segmentation comparisons,
+alongside the geometric-flow and distance-field approach used to recover
+chromosome instances.
+
+![ChromoPose: image preprocessing, instance segmentation comparisons and geometric-flow decoding](docs/images/chromopose.png)
+
+The released movie workflow runs **raw / preprocess / affine / segment /
+post / track** in that order. ChromoPose resizes frames internally for model
+inference and restores instance labels to the affine image grid with
+nearest-neighbor interpolation before downstream processing.
+
+[ChromoPose training and inference](Code/ChromoPhy/chromopose/segmentation/README.md) ·
+[Full 4D pipeline](Code/Analyze/fig5/README.md) ·
+[Retained keyframe demo](Code/Analyze/fig5/demo_outputs/chromopose/chromopose_keyframes_segmentation_8x5.png)
 
 ## Two reproduction routes
 
@@ -71,61 +146,6 @@ See the [ChromoPix guide](Code/ChromoPix/README.md) for CUDA requirements and
 evaluation settings. Use a dedicated environment per model. ChromoLift and
 ChromoID pin scikit-learn 1.7.1 for checkpoint scaler compatibility.
 
-## Figure gallery
-
-### Fig2–3 · Banding and FISH segmentation
-
-Each panel contains five samples, with input, GT and 24-color prediction.
-Colors encode chromosome classes, not confidence.
-
-<table>
-<tr><th>Banding</th><th>FISH</th></tr>
-<tr>
-<td><img src="Code/Analyze/fig2-3/demo_outputs/Banding_5x3.png" width="440" alt="Five Banding samples: input, GT, prediction"></td>
-<td><img src="Code/Analyze/fig2-3/demo_outputs/FISH_5x3.png" width="440" alt="Five FISH samples: input, GT, prediction"></td>
-</tr>
-</table>
-
-[Reproduce predictions, metrics and panels](Code/Analyze/fig2-3/README.md).
-
-### Fig4 · Fixed-cell morphology
-
-The Banding and FISH assets contain 711,541 combined rows. This view uses
-saved coordinates and the deterministic display sample.
-
-![Combined Banding and FISH morphology embedding](Code/Analyze/fig4/demo_outputs/umap_combined_both_24class.png)
-
-[Banding](Code/Analyze/fig4/demo_outputs/umap_banding_both_24class.png) ·
-[FISH](Code/Analyze/fig4/demo_outputs/umap_fish_both_24class.png) ·
-[Descriptor extraction, QC and plotting](Code/Analyze/fig4/README.md)
-
-### Fig5 · Volume morphology and lifted features
-
-<table>
-<tr><th>3D morphology</th><th>Lifted MIP morphology</th></tr>
-<tr>
-<td><img src="Code/Analyze/fig5/demo_outputs/chromophy/umap_3d_canvas_24class.png" width="440" alt="Saved 3D morphology embedding"></td>
-<td><img src="Code/Analyze/fig5/demo_outputs/chromophy/umap_liftedmip_class_24class.png" width="440" alt="Saved lifted MIP morphology embedding"></td>
-</tr>
-</table>
-
-The saved spaces are **3D / MIP / LiftedMIP / Lifted2D**. Labels come from
-stored reference or inference arrays. Embedding colors alone do not establish
-experimentally verified chromosome identity.
-
-<details>
-<summary><strong>ChromoPose keyframe segmentation demo</strong></summary>
-
-![ChromoPose segmentation of selected live-cell keyframes](Code/Analyze/fig5/demo_outputs/chromopose/chromopose_keyframes_segmentation_8x5.png)
-
-Retained qualitative demo. The 4D pipeline runs raw, preprocess, affine,
-segment, post and track stages. Masks return to the affine image grid after
-internal inference resizing.
-
-</details>
-
-[3D descriptors, 4D processing and UMAP reproduction](Code/Analyze/fig5/README.md).
-
 ## Models and repository layout
 
 | Component | Role | Guide |
@@ -144,7 +164,7 @@ ChromoWorld/
 ├── Artifacts/                  seven UMAP NPZs and fitting metadata
 ├── Checkpoint/                 weight layout and provenance instructions
 ├── Dataset/                    data layout and distribution instructions
-└── docs/images/                presentation-derived overview
+└── docs/images/                research overview and component figures
 ```
 
 ## Data and weights
@@ -179,8 +199,8 @@ the historical models are distinct reproduction tasks.
 
 ## Attribution and reuse
 
-The overview comes from the project's `chromoworld.pptx`, slide 1. Gallery
-images are retained Analyze demos. Third-party components include DINOv3,
+The overview and component figures are author-supplied research illustrations.
+The Banding/FISH panels are retained Analyze demos. Third-party components include DINOv3,
 Cellpose-SAM and optional FAST CHIMP weights; retain upstream notices and
 check redistribution terms before publishing weights.
 
