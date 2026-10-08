@@ -1,21 +1,19 @@
-# Standalone post v1.9-gap-bend. Python >=3.10.
+# Standalone post v2.0 readability. Python >=3.10.
 # Dependencies: numpy, scipy, scikit-image, tifffile, matplotlib.
-# Run: python postprocess.py --masks MASK_DIR --raw RAW_DIR --output NEW_DIR --hybrid-post
-# Non-idempotent: do not repeatedly process v1.8/v1.9 output.
-# Exact current-dataset reproduction uses preserved v1.5 masks and
-# --pattern "*_shape_postprocessed.tif". The chromosome count is a soft
-# stage prior only; it is never used as a hard per-frame target.
+# Run: python postprocess.py --masks MASK_DIR --raw RAW_DIR --output NEW_DIR --readability-post
+# Default: fill background by nearest original ID, absorb only small fragments,
+# then quarantine unresolved fragments. No large-instance merges or splitting.
+# Apply once to unprocessed CHRP3D predictions. Legacy modes remain available
+# only for reproducing older results and should not be used for readability.
 # Four helper modules are inlined below; no companion files are required.
 #!/usr/bin/env python3
-"""Signal-guided 3D instance repair. All outputs are separate and auditable.
+"""Signal-guided 3D mask completion for manual instance review.
 
-No target chromosome count, intensity enhancement, global closing or convex hull.
-Existing source masks/DAPI are never overwritten. Conservative geometric identity
-proposals are checked against raw signal and, when reliable, neighboring frames.
-The continuity-only mode is a relabel-only second pass for existing outputs: it
-absorbs enclosed fragments, joins locally smooth transverse cuts, resolves
-small seam chips, and uses independently registered neighboring frames to
-recognize longitudinal splits without changing the foreground support.
+Default readability mode fills small holes/seams with physical nearest-ID
+ownership, then absorbs only minor fragments with a clear substantial parent,
+then quarantines unresolved small fragments. Substantial source IDs and their
+source voxels remain unchanged. No count target, large-instance joining or
+instance splitting is applied. Legacy repair modes are explicit opt-ins.
 """
 
 from __future__ import annotations
@@ -33,7 +31,7 @@ from skimage.registration import optical_flow_tvl1, phase_cross_correlation
 from skimage.transform import warp
 import tifffile as tf
 
-VERSION = "signal-guided-instances-v1.9-gap-bend"
+VERSION = "signal-guided-instances-v2.0-readability"
 CONN = np.ones((3, 3, 3), bool)
 
 
@@ -90,6 +88,13 @@ class Settings:
     surface_refine: bool = False
     aggressive_refine: bool = False
     hybrid_refine: bool = False
+    readability_refine: bool = True
+    readable_fill_radius_um: float = 0.25
+    readable_added_fraction: float = 0.08
+    readable_instance_added_fraction: float = 0.10
+    readable_fragment_vref_fraction: float = 0.05
+    readable_fragment_parent_fraction: float = 0.12
+    readable_deleted_fraction: float = 0.01
 
 
 def read_frame(f, t):
@@ -1609,6 +1614,8 @@ def _repair_frame_base(source, raw, spacing, cfg, temporal_maps=()):
 
 
 def repair_frame(source, raw, spacing, cfg, temporal_maps=()):
+    if cfg.readability_refine:
+        return readability_repair(source, raw, spacing, cfg)
     if cfg.hybrid_refine:
         return hybrid_repair(source,raw,spacing)[:5]
     result, stats, ops, mapping, uncertain = _repair_frame_base(
@@ -1712,6 +1719,11 @@ def mask_basename(mask_path):
 def process_file(mask_path, raw_dir, out_dir, cfg, frame_indices=None, preview=True):
     base = mask_basename(mask_path)
     raw_path = raw_dir / (base + "-DAPI.tif")
+    if not raw_path.exists():
+        matches = list(raw_dir.rglob(base + "-DAPI.tif"))
+        if len(matches) != 1:
+            raise ValueError(f"Expected one matching DAPI for {base}, got {len(matches)}")
+        raw_path = matches[0]
     output_suffix = "_shape_continuity.tif" if cfg.continuity_only else "_shape_postprocessed.tif"
     if cfg.aggressive_refine:
         output_suffix = '_shape_aggressive.tif'
@@ -1776,7 +1788,7 @@ def process_file(mask_path, raw_dir, out_dir, cfg, frame_indices=None, preview=T
                 source, raw = get(t)
                 maps = []
                 temporal = []
-                if cfg.temporal and not cfg.hybrid_refine:
+                if cfg.temporal and not cfg.hybrid_refine and not cfg.readability_refine:
                     for nt in (t - 1, t + 1):
                         if 0 <= nt < shape[0]:
                             nl, nr = get(nt)
@@ -1788,7 +1800,7 @@ def process_file(mask_path, raw_dir, out_dir, cfg, frame_indices=None, preview=T
                 )
                 # uint32 avoids per-movie overflow if frame count varies greatly.
                 result = result.astype(np.uint32)
-                if (cfg.surface_refine or cfg.hybrid_refine) and np.any((source>0) & (result==0)):
+                if (cfg.surface_refine or cfg.hybrid_refine or cfg.readability_refine) and np.any((source>0) & (result==0)):
                     # Bright but structurally sub-resolution components are
                     # quarantined, not irreversibly discarded. Preserve IDs.
                     tf.imwrite(out_dir / 'qc' / (base + f'_t{t:03d}_removed_labels.tif'),
@@ -1871,14 +1883,21 @@ def process_file(mask_path, raw_dir, out_dir, cfg, frame_indices=None, preview=T
         id_mapping=mappings,
         verified_sha256=digest,
         seconds=round(time.monotonic() - started, 2),
-        limitations=[
+        limitations=([
+            "Readability mode fills background before absorbing/deleting small fragments",
+            "Original substantial instance IDs and all their source voxels are protected",
+            "Background ownership is nearest-source distance in physical ZYX coordinates",
+            "No large-instance joins, topology splits, target chromosome count or temporal tracking",
+            "Fragments and missing signal remain heuristic; removed labels are saved for review",
+            "Apply once to model predictions; do not feed previous postprocessed outputs back in",
+        ] if cfg.readability_refine else [
             "No learned stage classifier or full lineage tracking",
             "Temporal evidence uses gated rigid/dense XY registration, not full 3D deformation",
             "Conservative rule scores are not calibrated probabilities",
             "No target count; v1.8 can quarantine small components despite brightness or slenderness",
             "Hybrid refinement is per-frame; temporal correspondences do not exempt small fragments",
             "Tubeness and watershed ownership are heuristic proposals, not calibrated probabilities",
-        ],
+        ]),
     )
     report.write_text(json.dumps(result, indent=2))
     return result
@@ -1911,7 +1930,9 @@ def main():
                    help="Opt-in experimental local seam and signal-supported boundary repair; allows foreground changes even with --continuity-only")
     p.add_argument('--aggressive-refine',action='store_true',
                    help='High-recall fragment absorption/quarantine and curved skeleton endpoint joins; implies surface refinement')
-    p.add_argument('--hybrid-post',action='store_true',help='CHIMP-inspired tubeness/overseg completion (new CLI default)')
+    p.add_argument('--hybrid-post',action='store_true',help='Legacy v1.9 CHIMP-inspired completion and instance merging')
+    p.add_argument('--readability-post', action='store_true',
+                   help='Default: nearest-ID completion, small-fragment absorption, then quarantine; never merge large IDs')
     p.add_argument('--legacy-post',action='store_true',help='Use pre-v1.8 behavior')
     p.add_argument("--config", type=Path)
     p.add_argument(
@@ -1926,11 +1947,18 @@ def main():
         help="Skip complete outputs with identical config/version/source stat",
     )
     args = p.parse_args()
-    cfg = Settings(**json.loads(args.config.read_text())) if args.config else Settings(hybrid_refine=True)
+    cfg = Settings(**json.loads(args.config.read_text())) if args.config else Settings()
     if args.legacy_post or args.surface_refine or args.aggressive_refine:
         cfg.hybrid_refine=False
+        cfg.readability_refine=False
     if args.hybrid_post:
         cfg.hybrid_refine=True
+        cfg.readability_refine=False
+    if args.readability_post:
+        if args.hybrid_post or args.legacy_post or args.surface_refine or args.aggressive_refine:
+            p.error('Readability mode cannot be combined with legacy/hybrid/aggressive modes')
+        cfg.readability_refine=True
+        cfg.hybrid_refine=False
     if args.hybrid_post and args.legacy_post:
         p.error('Choose hybrid or legacy, not both')
     if args.no_temporal:
@@ -1942,6 +1970,15 @@ def main():
     if args.aggressive_refine:
         cfg.surface_refine = True
         cfg.aggressive_refine = True
+    if cfg.readability_refine:
+        if cfg.continuity_only:
+            p.error('Readability mode changes foreground; do not combine with continuity-only')
+        if (cfg.readable_fill_radius_um <= 0 or any(
+            not 0 < x < 1 for x in (
+                cfg.readable_added_fraction, cfg.readable_instance_added_fraction,
+                cfg.readable_fragment_vref_fraction, cfg.readable_fragment_parent_fraction,
+                cfg.readable_deleted_fraction))):
+            p.error('Readability radius must be positive and its fractions must lie between 0 and 1')
     if any(
         not 0 < v <= 1
         for v in (
@@ -2005,7 +2042,7 @@ def main():
     pattern = args.pattern or (
         "*_shape_postprocessed.tif" if cfg.continuity_only else "*_shape.tif"
     )
-    files = [args.masks] if args.masks.is_file() else sorted(args.masks.glob(pattern))
+    files = [args.masks] if args.masks.is_file() else sorted(args.masks.rglob(pattern))
     if not files:
         p.error("No masks matched")
     if args.output.resolve() in {args.raw.resolve(), args.masks.resolve()} or any(
@@ -2041,6 +2078,11 @@ def main():
         if args.resume and report.exists():
             r = json.loads(report.read_text())
             expected_raw = args.raw / (mask_basename(f) + "-DAPI.tif")
+            if not expected_raw.exists():
+                matches = list(args.raw.rglob(expected_raw.name))
+                if len(matches) != 1:
+                    raise ValueError('Resume DAPI pairing is ambiguous')
+                expected_raw = matches[0]
             if (
                 Path(r["mask"]).resolve() != f.resolve()
                 or Path(r["raw"]).resolve() != expected_raw.resolve()
@@ -2933,6 +2975,270 @@ def repair_gaps(labels, raw, spacing, tube, forbidden=None, budget=None):
     out=lut[out];mapping={str(i):root(i) for i in parent}
     return out,ops,mapping,dict(merged=len(ops),added_voxels=added,rejected=rejected,
                                 max_gap_um=maxgap,width_um=width)
+
+def readability_repair(source, raw, spacing, cfg):
+    """Fill -> absorb minor fragments -> quarantine, preserving substantial IDs.
+
+    All proposals use the untouched input mask as their ownership reference.
+    Watershed determines signal-supported fill regions, never instance identity.
+    There is no endpoint-join, transitive union-find, or topology-split step.
+    """
+    if source.shape != raw.shape or source.ndim != 3:
+        raise ValueError('Expected matching ZYX labels and DAPI')
+    if not np.issubdtype(source.dtype, np.integer) or source.min() < 0:
+        raise ValueError('Expected nonnegative integer source labels')
+    spacing = np.asarray(spacing, float)
+    original = source.astype('uint32', copy=False)
+    ids, sizes = np.unique(original[original > 0], return_counts=True)
+    foreground = int(sizes.sum())
+    initial_sizes = {int(i): int(n) for i, n in zip(ids, sizes)}
+    mapping = {str(int(i)): int(i) for i in ids}
+    if not foreground:
+        return original.copy(), dict(before=0, after=0, merged=0,
+            added_voxels=0, deleted_voxels=0, foreground_before=0,
+            foreground_after=0, merge_reasons={}), [], mapping, []
+
+    vref = max(8., float(np.percentile(sizes, 85)))
+    small_limit = cfg.readable_fragment_vref_fraction * vref
+    protected_ids = ids[sizes > small_limit]
+    extent = ndi.find_objects((original > 0).astype('uint8'))[0]
+    pad = np.ceil(max(.8, 2 * cfg.readable_fill_radius_um) / spacing).astype(int) + 2
+    crop = tuple(slice(max(0, s.start - int(pad[k])),
+                       min(original.shape[k], s.stop + int(pad[k])))
+                 for k, s in enumerate(extent))
+    seed = original[crop]
+    image = raw[crop]
+    fg = seed > 0
+    score, bg, noise = signal_score(image)
+    smooth = ndi.gaussian_filter(score, np.maximum(.06 / spacing, .3))
+    depth = ndi.distance_transform_edt(fg, sampling=spacing)
+    width = max(2 * float(np.percentile(depth[fg], 80)), 2 * min(spacing))
+    distance, indices = ndi.distance_transform_edt(~fg, sampling=spacing, return_indices=True)
+    nearest = seed[tuple(indices)]
+    del indices, depth
+    reach = min(cfg.readable_fill_radius_um, max(1.05 * min(spacing), .4 * width))
+    nlabels = int(ids.max()) + 1
+    seed_objects = ndi.find_objects(seed)
+    signal_by_id = np.zeros(nlabels, dtype='float32')
+    for lab, sl in enumerate(seed_objects, 1):
+        if sl is not None:
+            signal_by_id[lab] = max(2., float(np.median(smooth[sl][seed[sl] == lab])))
+    signal_floor = np.maximum(2.5, .25 * signal_by_id[nearest])
+    valid = (~fg) & (distance <= reach) & (score >= 1.5) & (smooth >= signal_floor)
+
+    # True bounded 3D cavities only. Open loops/valleys are not blanket-filled.
+    holes = np.zeros(seed.shape, bool)
+    for lab, sl0 in enumerate(seed_objects, 1):
+        if sl0 is None:
+            continue
+        sl = tuple(slice(max(0, s.start - 1), min(seed.shape[k], s.stop + 1))
+                   for k, s in enumerate(sl0))
+        own = seed[sl] == lab
+        cavity = ndi.binary_fill_holes(own) & ~own & (seed[sl] == 0)
+        cc, _ = ndi.label(cavity, structure=CONN)
+        counts = np.bincount(cc.ravel())
+        allowed = np.flatnonzero((counts <= max(2, .03 * initial_sizes[lab])) & (counts > 0))
+        allowed = allowed[allowed > 0]
+        holes[sl] |= np.isin(cc, allowed)
+
+    # Local closing is a geometric proposal on the foreground, not a label
+    # merge. The footprint is small in physical units and cannot exceed reach.
+    radius = min(reach, max(min(spacing), .20 * width))
+    half = np.ceil(radius / spacing).astype(int)
+    grid = np.ogrid[tuple(slice(-int(h), int(h) + 1) for h in half)]
+    footprint = sum((g * s) ** 2 for g, s in zip(grid, spacing)) <= radius ** 2 * 1.001
+    closed = ndi.binary_closing(fg, structure=footprint)
+    seams = closed & ~fg
+
+    tube, tube_info = physical_tubeness(image, fg, spacing)
+    tube_near = ndi.maximum_filter(tube, size=tuple(2 * half + 1))
+    proposed = valid & (holes | seams | (tube_near >= .06))
+    support = fg | proposed
+    normalizer = max(3., float(np.percentile(smooth[fg], 95)))
+    feature = (.7 * np.clip(smooth / normalizer, 0, 1) + .3 * tube).astype('float32')
+    peaksize = tuple(int(2 * np.ceil(max(.12, .45 * width) / s) + 1) for s in spacing)
+    maxima = support & (feature >= .05) & (feature == ndi.maximum_filter(feature, size=peaksize))
+    markers, marker_count = ndi.label(maxima, structure=CONN)
+    for lab, sl in enumerate(seed_objects, 1):
+        if sl is None:
+            continue
+        own = seed[sl] == lab
+        pos = np.unravel_index(np.argmax(np.where(own, feature[sl], -1)), own.shape)
+        if not markers[sl][pos]:
+            marker_count += 1
+            markers[sl][pos] = marker_count
+    regions = watershed(-feature, markers, mask=support, connectivity=CONN)
+    anchored_regions = np.bincount(regions[fg], minlength=int(regions.max()) + 1) >= 3
+    anchored_regions[0] = False
+    candidates = proposed & (holes | seams | anchored_regions[regions])
+    # Assign all accepted background to its nearest ORIGINAL label, even where
+    # watershed might favour a brighter or larger neighboring instance.
+    output = seed.copy()
+    global_budget = int(cfg.readable_added_fraction * foreground)
+    added = 0
+    operations = []
+    rejected = []
+    proposal_labels = np.where(candidates, nearest, 0)
+    for lab, sl0 in enumerate(ndi.find_objects(proposal_labels), 1):
+        if sl0 is None:
+            continue
+        positions = np.argwhere(proposal_labels[sl0] == lab)
+        original_sl = seed_objects[lab - 1]
+        sl = tuple(slice(min(a.start, b.start), max(a.stop, b.stop))
+                   for a, b in zip(sl0, original_sl))
+        absolute = positions + np.array([s.start for s in sl0])
+        local_positions = absolute - np.array([s.start for s in sl])
+        own = seed[sl] == lab
+        allowed = own.copy()
+        allowed[tuple(local_positions.T)] = True
+        connected = ndi.binary_propagation(own, mask=allowed, structure=CONN)
+        connected_mask = connected[tuple(local_positions.T)]
+        absolute = absolute[connected_mask]
+        if not len(absolute):
+            continue
+        coordinates = tuple(absolute.T)
+        priority = (4 * holes[coordinates] + 2 * seams[coordinates] + feature[coordinates]
+                    - distance[coordinates] / max(reach, 1e-8))
+        # Allocate proportionally before iterating, so a low numeric ID cannot
+        # consume the frame budget and starve later IDs of completion.
+        share = min(cfg.readable_instance_added_fraction, cfg.readable_added_fraction)
+        limit = min(int(share * initial_sizes[lab]), global_budget - added)
+        if limit <= 0:
+            rejected.append(dict(label=lab, reason='fill_budget'))
+            continue
+        if len(absolute) > limit:
+            absolute = absolute[np.argsort(priority)[-limit:]]
+        # Check connectivity again after truncating to the volume budget.
+        local_positions = absolute - np.array([s.start for s in sl])
+        allowed = own.copy()
+        allowed[tuple(local_positions.T)] = True
+        connected = ndi.binary_propagation(own, mask=allowed, structure=CONN)
+        absolute = absolute[connected[tuple(local_positions.T)]]
+        coordinates = tuple(absolute.T)
+        output[coordinates] = lab
+        added += len(absolute)
+        operations.append(dict(action='nearest_id_completion', members=[lab], voxels=len(absolute),
+            holes=int(holes[coordinates].sum()),
+            seams=int((seams[coordinates] & ~holes[coordinates]).sum()),
+            tubeness=int((~seams[coordinates] & ~holes[coordinates]).sum())))
+
+    # Frozen minor-fragment list and frozen substantial-parent list prevent
+    # repeated absorption or growth from turning two major labels into one ID.
+    minor_ids = ids[sizes <= small_limit]
+    parent_ids = set(int(i) for i, n in initial_sizes.items() if n >= .20 * vref and n > small_limit)
+    absorption_candidates = []
+    cross = ndi.generate_binary_structure(3, 1)
+    output_objects = ndi.find_objects(output)
+    for lab0 in minor_ids:
+        lab = int(lab0)
+        sl0 = output_objects[lab - 1]
+        if sl0 is None:
+            continue
+        sl = tuple(slice(max(0, s.start - 1), min(output.shape[k], s.stop + 1))
+                   for k, s in enumerate(sl0))
+        sub = output[sl]
+        own = sub == lab
+        surface = own & ~ndi.binary_erosion(own, structure=cross, border_value=0)
+        surface_count = max(1, int(surface.sum()))
+        contact_labels = np.unique(sub[ndi.binary_dilation(own, structure=CONN) & ~own])
+        contacts = []
+        for dest0 in contact_labels:
+            dest = int(dest0)
+            if dest not in parent_ids:
+                continue
+            if initial_sizes[lab] > cfg.readable_fragment_parent_fraction * initial_sizes[dest]:
+                continue
+            touching = surface & ndi.binary_dilation(sub == dest, structure=CONN)
+            fraction = float(touching.sum() / surface_count)
+            if touching.sum() < 3 or fraction < .25:
+                continue
+            if float(np.median(smooth[sl][touching])) < 2.5:
+                continue
+            contacts.append((fraction, dest, int(touching.sum())))
+        contacts.sort(reverse=True)
+        if contacts:
+            fraction, dest, contact_voxels = contacts[0]
+            runner_up = contacts[1][0] if len(contacts) > 1 else 0.
+            if fraction >= 2 * runner_up and fraction - runner_up >= .15:
+                absorption_candidates.append((lab, dest, fraction, contact_voxels))
+            else:
+                rejected.append(dict(label=lab, reason='ambiguous_fragment_parent'))
+    for lab, dest, fraction, contact_voxels in absorption_candidates:
+        output[output == lab] = dest
+        mapping[str(lab)] = dest
+        operations.append(dict(action='merge', reason='readable_minor_fragment_absorption',
+            members=[lab, dest], fragment_label=lab, parent_label=dest,
+            source_fragment_voxels=initial_sizes[lab], contact_fraction=fraction,
+            contact_voxels=contact_voxels))
+
+    delete_budget = int(cfg.readable_deleted_fraction * foreground)
+    deleted = 0
+    # A small coherent rod can be a complete small chromosome. Preserve such
+    # objects; quarantine sub-resolution/unstructured leftovers within budget.
+    deletion_candidates = []
+    objects = ndi.find_objects(output)
+    for lab0 in minor_ids:
+        lab = int(lab0)
+        if mapping[str(lab)] != lab:
+            continue
+        sl = objects[lab - 1]
+        if sl is None:
+            continue
+        own = output[sl] == lab
+        cc, components = ndi.label(own, structure=CONN)
+        coords = np.argwhere(own).astype(float) * spacing
+        covariance = np.cov(coords.T) if len(coords) > 3 else np.zeros((3, 3))
+        eigenvalues = np.linalg.eigvalsh(covariance + np.diag(spacing ** 2 / 12))
+        elongation = float(np.sqrt(eigenvalues[-1] / eigenvalues[-2]))
+        span = float(np.linalg.norm(np.ptp(coords, axis=0)))
+        coherent_rod = (components == 1 and initial_sizes[lab] >= .02 * vref
+                        and elongation >= 2.2 and span >= 2 * width)
+        if coherent_rod:
+            rejected.append(dict(label=lab, reason='preserved_small_coherent_rod'))
+            continue
+        deletion_candidates.append((initial_sizes[lab], lab, sl, own))
+    for count, lab, sl, own in sorted(deletion_candidates, key=lambda x: (x[0], x[1])):
+        if deleted + count > delete_budget:
+            rejected.append(dict(label=lab, reason='fragment_delete_budget'))
+            continue
+        removed_added = int((own & (seed[sl] == 0)).sum())
+        output[sl][own] = 0
+        deleted += count
+        added -= removed_added
+        mapping[str(lab)] = 0
+        operations.append(dict(action='quarantine_readable_fragment', members=[lab],
+            voxels=count, removed_completion_voxels=removed_added,
+            fraction_of_reference=count / vref))
+
+    full = np.zeros(original.shape, dtype='uint32')
+    full[crop] = output
+    lut = np.arange(nlabels, dtype='uint32')
+    for old, new in mapping.items():
+        lut[int(old)] = new
+    # These assertions enforce the user's intent on every frame, including
+    # labels that touch after filling. No substantial ID can be merged/deleted.
+    assert np.array_equal(full[original > 0], lut[original[original > 0]])
+    assert all(mapping[str(int(i))] == int(i) for i in protected_ids)
+    background_added = (seed == 0) & (output > 0)
+    assert np.array_equal(output[background_added], lut[nearest[background_added]])
+    assert set(np.unique(full)) <= set(np.unique(original)) | {0}
+    assert int(((original == 0) & (full > 0)).sum()) == added
+    assert int(((original > 0) & (full == 0)).sum()) == deleted
+    final_ids = np.unique(full[full > 0])
+    stats = dict(before=len(ids), after=len(final_ids), merged=len(absorption_candidates),
+        added_voxels=added, deleted_voxels=deleted, foreground_before=foreground,
+        foreground_after=int((full > 0).sum()),
+        merge_reasons={'readable_minor_fragment_absorption': len(absorption_candidates)},
+        readable=dict(volume_reference_voxels=vref, fragment_limit_voxels=small_limit,
+            width_um=width, fill_radius_um=reach, protected_instances=len(protected_ids),
+            protected_ids_preserved=True, nearest_id_ownership_verified=True,
+            large_instance_merges=0, topology_splits=0, temporal_used=False,
+            deleted_instances=sum(v == 0 for v in mapping.values()),
+            added_budget_voxels=global_budget, deleted_budget_voxels=delete_budget,
+            tubeness=tube_info, rejected=rejected))
+    assert stats['foreground_after'] == foreground + added - deleted
+    return full, stats, operations, mapping, []
+
 
 if __name__ == "__main__":
     main()
