@@ -1,4 +1,4 @@
-# ChromoLift: seven-feature 2D-to-3D flow matching
+# ChromoLift: 2D-to-3D flow matching
 
 Run commands from the release root. model.py defines the checkpoint-compatible
 network; train.py trains and validates it; infer.py performs the maintained
