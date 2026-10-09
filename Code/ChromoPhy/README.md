@@ -26,10 +26,8 @@ python Code/ChromoPhy/chromopose/segmentation/infer.py \
 
 For the full raw-to-tracked workflow, use
 Code/Analyze/fig5/get-4dmask_TIFF2TIFF.py. Legacy mask-assisted affine remains
-an explicit historical route. preprocess_tag.py and preprocess_tag_top6.py
-are audited maintenance utilities for the external ours-live layout;
-the top-six utility requires the prior tag_processing_report.json. They are
-not automatically invoked by the general DAPI movie pipeline.
+an explicit historical route. Tag-specific maintenance utilities are not
+included in the released DAPI movie pipeline.
 
 ## ChromoLift
 
@@ -49,5 +47,5 @@ The five-feature Lifted2D UMAP asset cannot replace this 7D gallery.
 See [ChromoID](chromoid/README.md).
 
 The saved seven figure embeddings can be rendered independently with
-Code/Analyze/fig5/visualize-umap_NPZ2PNG.py. Model training, gallery rebuilding,
+Code/Analyze/fig4/visualize-umap_NPZ2PNG.py. Model training, gallery rebuilding,
 and saved-coordinate plotting have different resource requirements.

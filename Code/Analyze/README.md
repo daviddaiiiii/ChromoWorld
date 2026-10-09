@@ -10,8 +10,6 @@ entry points resolve from the release root; absolute paths are also accepted.
 ```bash
 python Code/Analyze/fig2-3/get-polygon_PNG2TXT.py --gpu_id 0
 python Code/Analyze/fig2-3/get-metrics_TXT2CSV.py
-python Code/Analyze/fig2-3/create_fig2_3_demo.py \
-  --pred-dir Code/Analyze/results/predictions/ChromoPix
 ```
 
 The input is Dataset/2D/test/image and the reference labels are
@@ -36,7 +34,8 @@ python Code/Analyze/fig2-3/get-metrics_TXT2CSV.py \
 The comparison models' inference code and weights are not bundled.
 test-robustness_TXT2PNG.py creates synchronized image/label perturbations;
 rerun inference and evaluation on each generated condition for Fig3.
-See [Fig2-3](fig2-3/README.md) for the five-row Banding/FISH panels.
+See [Fig2-3](fig2-3/README.md) for the retained five-row Banding/FISH panels
+and the per-image polygon visualizer.
 
 ## Fig4: morphology and saved fixed-cell embeddings
 
@@ -46,7 +45,7 @@ Their enriched feature export is separate from the five historical features
 used to fit the published UMAPs.
 
 ```bash
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/Combine_umap_embed.npz --space Combine
 ```
 
@@ -60,11 +59,14 @@ get-3dmask_TIFF2TIFF.py uses the outsourced CPSAM checkpoint on 3D TIFFs.
 get-3ddescriptor_TIFF2JSON.py pairs volumes with instance masks.
 get-4dmask_TIFF2TIFF.py runs raw → preprocess → image-only affine →
 ChromoPose → postprocess → track.
+get-visualize-image_TIFF2GIF.py and get-visualize-mask_TIFF2GIF.py render
+six-second, fixed front/back views with physical scale bars and independent
+instance colors. See the Fig5 README for directory layout and calibration.
 
 ```bash
 python Code/Analyze/fig5/get-4dmask_TIFF2TIFF.py \
   --input /data/raw_movies --output-dir /output/4d --gpu-ids 0
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig5/3D_umap_embed.npz --space 3D
 ```
 

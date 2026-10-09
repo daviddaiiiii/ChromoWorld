@@ -37,11 +37,11 @@ and fitting settings recorded in Artifacts/fig4/fixed_umap_meta.json.
 ## Redraw the published UMAPs
 
 ```bash
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/Banding_umap_embed.npz --space Banding
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/FISH_umap_embed.npz --space FISH
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/Combine_umap_embed.npz --space Combine
 ```
 

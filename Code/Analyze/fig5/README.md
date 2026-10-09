@@ -58,15 +58,52 @@ reviewed representative_t values. Completed stages are checked before reuse;
 changed sources or settings are rejected. The legacy mask-assisted affine
 route remains an explicit historical option in chromopose/affine.py.
 
-Dataset-specific keyframe renderers require an external movie root and
-representative-frame manifest. Those inputs and Chimps training movies are
-not currently in Dataset; the retained demo_outputs illustrate past outputs.
+Chimps training movies are not currently in Dataset; the retained
+demo_outputs illustrate past outputs.
+
+## Fixed front/back TIFF-to-GIF visualization
+
+```bash
+python Code/Analyze/fig5/get-visualize-image_TIFF2GIF.py \
+  --input-root /data/release/image --output-root /output/image \
+  --folders raw raw_pre raw_pre_affine
+python Code/Analyze/fig5/get-visualize-mask_TIFF2GIF.py \
+  --input-root /data/release/mask --output-root /output/mask \
+  --folders chrp3d_post chrp3d_affine_post chrp3d_post_tracked chrp3d_affine_post_tracked
+```
+
+Keep these two scripts together: the image renderer imports display/calibration
+helpers from the sibling mask renderer. Both accept calibrated ZYX/TZYX TIFFs,
+including singleton-channel movies. A group can contain TIFFs directly, under
+chr3/chr18/others, or under tiff/chr3/chr18/others. Outputs go to
+OUTPUT_ROOT/GROUP/gif/CATEGORY (flat inputs produce flat gif folders).
+Hidden backups are excluded and the image CLI skips Tag-named TIFFs.
+
+Default playback is six seconds across all source timepoints, with a fixed +Z
+front view on the left and a -Z back view on the right (180 degrees around Y).
+No rotating views or titles are used. Mask rendering selects visible surfaces
+by depth, uses ordinary per-instance colors (not 24-class buckets), and adds
+bounded surface shading. Equal IDs retain a base color but do not imply a
+tracking identity unless the input itself is tracked.
+
+Images use illustrative emission/absorption volume rendering and one shared
+movie-wide contrast/gamma mapping; --projection mip selects MIP instead. These
+are display effects, not quantitative fluorescence or changes to source data.
+All Z planes participate, and source TIFFs are read-only.
+
+Scale bars require calibrated TIFF length units, Z spacing, and X/Y resolution.
+For an uncalibrated mask, --calibration-reference-root can supply a uniquely
+matching *-DAPI TIFF on the exact same TZYX grid; matching shape alone does not
+prove registration, so use only the corresponding image. Missing calibration
+is an error, not an invented scale bar. Dependencies are in ../requirements.txt.
+No JSON or debugging assets are produced by default; --report-json /output/audit.json
+opts into a report. Concurrent workers should use separate report filenames.
 
 ## Redraw saved 3D/MIP/lifted UMAPs
 
 ```bash
 for space in 3D MIP LiftedMIP Lifted2D; do
-  python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+  python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
     --embedding-npz "Artifacts/fig5/${space}_umap_embed.npz" --space "$space"
 done
 ```

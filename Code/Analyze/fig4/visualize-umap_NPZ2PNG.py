@@ -2,8 +2,8 @@
 """Render any saved Fig4/Fig5 ChromoWorld UMAP embedding from an NPZ.
 
 This is a plotting-only script: it uses saved two-dimensional coordinates and
-does not fit or refit UMAP. It accepts the named per-space NPZ assets from both
-Artifacts/fig4 and Artifacts/fig5.
+does not fit or refit UMAP. This shared entry point lives in Analyze/fig4 and
+accepts named per-space NPZ assets from both Artifacts/fig4 and Artifacts/fig5.
 """
 
 from __future__ import annotations

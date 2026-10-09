@@ -7,8 +7,6 @@ script and are not part of the packaged train/test dataset.
 ```bash
 python Code/Analyze/fig2-3/get-polygon_PNG2TXT.py --gpu_id 0
 python Code/Analyze/fig2-3/get-metrics_TXT2CSV.py
-python Code/Analyze/fig2-3/create_fig2_3_demo.py \
-  --pred-dir Code/Analyze/results/predictions/ChromoPix
 ```
 
 The defaults locate ChromoPix and DINOv3 weights in Checkpoint and save
@@ -21,11 +19,11 @@ The historical ChromoPix metric filters predictions by GT-present classes.
 
 The curated panels in demo_outputs are Banding_5x3.png and FISH_5x3.png:
 five samples as rows, and input / GT / 24-color prediction as columns.
-create_fig2_3_demo.py selects the same ten stems from the test set. Unlabelled
-FISH GT instances use neutral gray.
+These are retained reference panels; their historical panel generator is no
+longer included. Unlabelled FISH GT instances use neutral gray.
 
-get-visualize_TXT2PNG.py and visualize-mask-overlay_TXT2PNG.py offer per-image
-polygon views. test-robustness_TXT2PNG.py generates synchronized perturbations
+get-visualize_TXT2PNG.py offers per-image polygon views.
+test-robustness_TXT2PNG.py generates synchronized perturbations
 of image/label pairs; rerun the inference entry on its image outputs and the
 evaluator on the corresponding transformed labels to reproduce Fig3 metrics.
 

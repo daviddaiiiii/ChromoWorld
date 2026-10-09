@@ -23,9 +23,9 @@ ChromoLift or ChromoID. In particular, `Lifted2D` is not a ChromoID gallery.
 From the release root:
 
 ```bash
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/Combine_umap_embed.npz
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig5/LiftedMIP_umap_embed.npz
 ```
 

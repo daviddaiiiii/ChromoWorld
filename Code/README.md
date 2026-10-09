@@ -39,7 +39,7 @@ descriptors, runs the ChromoPose 4D pipeline, and renders live/lifted UMAPs.
 python -m pip install -r Code/Analyze/requirements.txt
 python Code/Analyze/fig2-3/get-polygon_PNG2TXT.py --gpu_id 0
 python Code/Analyze/fig2-3/get-metrics_TXT2CSV.py
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/Combine_umap_embed.npz --space Combine
 ```
 

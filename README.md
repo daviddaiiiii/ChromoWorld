@@ -119,11 +119,11 @@ source .venv/bin/activate
 python -m pip install numpy matplotlib
 
 # Fixed-cell morphology: saved Banding + FISH coordinates
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig4/Combine_umap_embed.npz
 
 # Live-cell morphology: saved lifted MIP coordinates
-python Code/Analyze/fig5/visualize-umap_NPZ2PNG.py \
+python Code/Analyze/fig4/visualize-umap_NPZ2PNG.py \
   --embedding-npz Artifacts/fig5/LiftedMIP_umap_embed.npz
 ```
 

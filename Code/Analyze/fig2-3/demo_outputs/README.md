@@ -6,5 +6,6 @@ This folder contains only the two five-row, three-column qualitative panels:
 - `FISH_5x3.png`
 
 Each row is one processed test image. The columns are input, ground truth, and
-24-class ChromoPix prediction. See the parent Fig2-3 README for regeneration
-instructions.
+24-class ChromoPix prediction. These are retained reference panels; the
+historical panel generator is no longer included. See the parent Fig2-3 README
+for inference, evaluation, and per-image polygon visualization.
