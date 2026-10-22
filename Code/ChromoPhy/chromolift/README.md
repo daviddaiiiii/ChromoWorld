@@ -1,5 +1,7 @@
 # ChromoLift: 2D-to-3D flow matching
 
+[Download the released ChromoLift checkpoint](../../../docs/downloads.md#chromoworld-weights).
+
 Run commands from the release root. model.py defines the checkpoint-compatible
 network; train.py trains and validates it; infer.py performs the maintained
 50-step Euler lift; evaluate.py scores paired held-out descriptor rows.

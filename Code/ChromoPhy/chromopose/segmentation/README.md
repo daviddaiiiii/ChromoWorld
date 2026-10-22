@@ -1,5 +1,7 @@
 # ChromoPose3D segmentation
 
+[Download ChromoPose weights and external Chimps data](../../../../docs/downloads.md).
+
 The segmentation package has seven focused Python modules:
 
 - `dataloader.py` — Chimps sample indexing, TIFF I/O, normalization, resizing,

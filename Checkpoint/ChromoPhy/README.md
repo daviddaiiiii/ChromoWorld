@@ -1,6 +1,8 @@
 # ChromoPhy checkpoints
 
-Project models and fitted artifacts kept here:
+These are local runtime destinations, not embedded weight files. Download
+the internal models from the flat [Drive ckpt folder](https://drive.google.com/drive/folders/1B4LLQiesGVCVG3aq-7846YpRV52jHJg3)
+using the [filename mapping and commands](../../docs/downloads.md#chromoworld-weights).
 
 - `ChromoPose/last.pth`: July 2026 ChromoPose3D 4D segmentation checkpoint.
   `ChromoPose/training_run/args.json` contains its inference configuration.
@@ -17,8 +19,8 @@ is not retained in this release. Rebuild it with the ChromoID training entry
 point and place it at `Artifacts/ChromoID/gallery_7d_cache.npz`; it uses
 ChromoLift's 3D scaler. The saved figure embeddings are not this gallery.
 
-The third-party Cellpose-SAM model used for the 3D baseline is in
-`../Outsource/CPSAM/cpsam`.
+The third-party Cellpose-SAM model used for the 3D baseline must be downloaded
+from its [official source](../Outsource/README.md) to `../Outsource/CPSAM/cpsam`.
 
 The unrelated May 2026 flow-matching ChromoPose checkpoints are not part of
 this current release or inference pipeline.

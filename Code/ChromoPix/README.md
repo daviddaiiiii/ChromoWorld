@@ -1,5 +1,7 @@
 # ChromoPix: 24-class 2D segmentation
 
+[Download ChromoPix and DINOv3 weights](../../docs/downloads.md).
+
 Run commands from the release root. chromopix/ contains dataloader.py,
 model.py, train.py, train.sh, infer.py, evaluate.py, and shared training
 utilities. The required DINOv3 source subset and upstream license are

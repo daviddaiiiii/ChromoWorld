@@ -174,14 +174,19 @@ ChromoWorld/
 ## Data and weights
 
 GitHub contains code, approximately 40 MB of UMAP assets, and curated demos.
-Large image datasets and model weights remain outside Git. Download URLs are
-pending publication; a one-command dataset/weight download is not yet available.
+Large image datasets and model weights remain outside Git. See the
+[model download links and first-use commands](docs/downloads.md) for the
+verified weight inventory and official DINOv3, CPSAM, FAST-CHIMP, and Chimps sources.
+Drive access was checked while authenticated, not as an anonymous user.
+No checkpoint binaries are embedded: internal models are in the flat Drive
+`ckpt/` folder; CPSAM, CARE, EmbedSeg, VoxelMorph, and DINOv3 have only
+official upstream download links and instructions.
 
 | Package | Current size | Expected local path |
 | --- | --- | --- |
 | 2D train + test, no robustness | About 3.6 GB compressed, sampled estimate | `Dataset/2D/{train,test}/{image,label}` |
 | Matched 3D DAPI/Tag package | 37.56 GB, existing archive | `Dataset/3D/DAPI_Tag_matched_1333pairs.tar.gz` |
-| Project and third-party weights | Distributed separately | `Checkpoint/` |
+| ChromoPix / ChromoPose / ChromoLift weights | [ckpt folder](https://drive.google.com/drive/folders/1B4LLQiesGVCVG3aq-7846YpRV52jHJg3) | [Download-to-runtime filename mapping](Checkpoint/README.md) |
 
 [Dataset sizes and publication plan](Dataset/README.md) ·
 [Checkpoint layout and provenance](Checkpoint/README.md) ·

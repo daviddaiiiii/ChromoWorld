@@ -81,6 +81,8 @@ route remains an explicit historical option in chromopose/affine.py.
 
 Chimps training movies are not currently in Dataset; the retained
 demo_outputs illustrate past outputs.
+The authors' [Chimps download and required input layout](../../../docs/downloads.md#chimps--external-paired-imagemask-benchmark)
+are documented separately, along with the [ChromoPose checkpoint and CPSAM downloads](../../../docs/downloads.md).
 
 ## Standalone automatic crop
 

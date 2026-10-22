@@ -24,6 +24,17 @@ Checkpoint/**
 !Checkpoint/**/training_run/train.csv
 !Checkpoint/**/training_run/test.csv
 
+# Never embed checkpoint binaries elsewhere in the release either.
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.hdf5
+*.safetensors
+*.onnx
+**/cpsam
+!**/cpsam/
+
 # Local training and evaluation products, not curated figure demos.
 Code/**/outputs/
 Code/Analyze/results/
