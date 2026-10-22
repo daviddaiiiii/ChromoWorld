@@ -1407,8 +1407,11 @@ def _evidence_objects(frame,spacing):
     return out
 
 class _evidence_Motion:
-    def __init__(self,raw,spacing,cache,fingerprint):
+    def __init__(self,raw,spacing,cache,fingerprint,workers=None):
+        from concurrent.futures import ThreadPoolExecutor
         from skimage.registration import optical_flow_tvl1
+        workers=int(os.environ.get('CHROMOWORLD_FLOW_WORKERS','2')) if workers is None else workers
+        if workers not in (1,2,3,4):raise ValueError('Flow workers must be 1..4')
         self.spacing=spacing;cache=Path(cache);cache.mkdir(parents=True,exist_ok=True)
         meta=cache/'cache.json';key=dict(version=EVIDENCE_MOTION_VERSION,raw_sha256=fingerprint,shape=list(raw.shape),spacing=spacing.tolist(),coarse_um=.35)
         if meta.exists():assert json.loads(meta.read_text())==key,'Refuse stale flow cache'
@@ -1426,16 +1429,23 @@ class _evidence_Motion:
         self.factors=np.divide(np.array(coarse.shape[1:])-1, np.maximum(1,np.array(raw.shape[1:])-1))
         self.factors=np.maximum(self.factors,1e-8)
         self.forward=[];self.backward=[]
-        for t in range(len(raw)-1):
-            for a,b,dest,name in [(t,t+1,self.forward,f'f{t:02d}.npy'),(t+1,t,self.backward,f'b{t:02d}.npy')]:
-                path=cache/name
-                if path.exists():flow=np.load(path)
-                else:
-                    tick=time.monotonic()
-                    flow=optical_flow_tvl1(coarse[a],coarse[b],attachment=15,tightness=.3,num_warp=4,num_iter=8,prefilter=True)
-                    pending=path.with_suffix('.writing.npy');np.save(pending,flow);os.replace(pending,path)
-                    print('FLOW',a,b,'seconds',round(time.monotonic()-tick,1),flush=True)
-                assert flow.shape==(3,*coarse.shape[1:]);dest.append(flow)
+        tasks=[item for t in range(len(raw)-1) for item in
+            [(t,t+1,f'f{t:02d}.npy'),(t+1,t,f'b{t:02d}.npy')]]
+        def compute(task):
+            a,b,name=task;path=cache/name
+            if path.exists():flow=np.load(path)
+            else:
+                tick=time.monotonic()
+                flow=optical_flow_tvl1(coarse[a],coarse[b],attachment=15,tightness=.3,num_warp=4,num_iter=8,prefilter=True)
+                pending=path.with_suffix('.writing.npy');np.save(pending,flow);os.replace(pending,path)
+                print('FLOW',a,b,'seconds',round(time.monotonic()-tick,1),flush=True)
+            assert flow.shape==(3,*coarse.shape[1:])
+            return flow
+        # Each field has independent scratch arrays/cache paths. Preserve task
+        # order and numerical results while overlapping two CPU-only solves.
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for (_,_,name),flow in zip(tasks,pool.map(compute,tasks)):
+                (self.forward if name.startswith('f') else self.backward).append(flow)
 
     def displace(self,points,field):
         coords=(points*self.factors).T
@@ -1746,6 +1756,7 @@ def main():
     p.add_argument("--repair-existing", action="store_true", help="Evidence-only repair of existing tracks; requires --raw and --initial-tracks")
     p.add_argument("--skip-evidence-repair", action="store_true", help="Historical v3.2 behavior without final raw-motion evidence gate")
     p.add_argument("--evidence-cache", type=Path, help="Reusable raw-only flow cache (default OUTPUT/flow_cache)")
+    p.add_argument("--flow-workers", type=int, choices=(1,2,3,4), default=2, help="Independent CPU flow solves per movie (default 2)")
     p.add_argument("--cleanup-only",action="store_true",help="Clean current tracking without rerunning identity inference")
     p.add_argument("--temporal-window",type=int,default=6)
     p.add_argument("--frame-interval-seconds",type=float,help="Only supply a verified acquisition interval")
@@ -1753,6 +1764,7 @@ def main():
     p.add_argument("--duration-seconds",type=float,default=6.);p.add_argument("--gif-max-size",type=int,default=300)
     p.add_argument("--limit",type=int,default=0);p.add_argument("--sample",action="append",default=[])
     p.add_argument("--resume",action="store_true");args=p.parse_args()
+    os.environ['CHROMOWORLD_FLOW_WORKERS']=str(args.flow_workers)
     if args.input.resolve()==args.output.resolve():p.error("Output must differ from source masks")
     if args.initial_tracks and args.initial_tracks.resolve()==args.output.resolve():p.error("Output must differ from initial tracking")
     if args.initial_tracks and not args.raw:p.error("Initial-track refinement requires matched DAPI")

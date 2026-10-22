@@ -124,4 +124,16 @@ class RepairTests(unittest.TestCase):
                     self.assertEqual(audit['version'],track.VERSION)
                     self.assertEqual(audit['evidence_repair']['version'],track.EVIDENCE_VERSION)
 
+    def test_serial_and_parallel_flows_are_numerically_identical(self):
+        rng=np.random.default_rng(3)
+        raw=rng.integers(0,2000,(3,8,16,20),dtype=np.uint16)
+        raw[1]=np.roll(raw[0],1,axis=2);raw[2]=np.roll(raw[1],1,axis=2)
+        original=raw.copy()
+        with tempfile.TemporaryDirectory() as tmp:
+            one=track._evidence_Motion(raw,np.array([.3,.1,.1]),Path(tmp)/'serial','same',workers=1)
+            two=track._evidence_Motion(raw,np.array([.3,.1,.1]),Path(tmp)/'parallel','same',workers=2)
+            for a,b in zip(one.forward+one.backward,two.forward+two.backward):
+                self.assertTrue(np.array_equal(a,b))
+            self.assertTrue(np.array_equal(raw,original))
+
 if __name__=='__main__':unittest.main()

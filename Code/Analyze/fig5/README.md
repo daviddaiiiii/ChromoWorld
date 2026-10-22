@@ -177,6 +177,11 @@ not in the input data. Acquisition intervals are read only when calibrated;
 otherwise matching is in frame units. Synthetic tests are not an accuracy
 benchmark on real chromosome identities.
 
+Independent CPU flow solves run with two workers per movie by default, with
+the same numerical fields as serial execution. Use `--flow-workers 1` when
+launching many movie processes to avoid oversubscribing CPUs. The Python API
+also honors `CHROMOWORLD_FLOW_WORKERS` (1–4). No GPU/weights are used for repair.
+
 ## Fixed front/back TIFF-to-GIF visualization
 
 ```bash
