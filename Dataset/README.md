@@ -1,7 +1,8 @@
 # Datasets: 2D, 3D and 4D
 
 Datasets are hosted in [Drive / Dataset](https://drive.google.com/drive/folders/1ou6-J-qmmIMVm7H0XyIVlY5touqYBcWh), not embedded in Git.
-Links and inventories were checked on 2026-10-22. **The current files require
+2D/3D links and inventories were checked on 2026-10-22; the 4D upload and
+remote checksums were verified on 2026-10-23. **The current files require
 Drive access**: sign in with an authorized account or request access.
 Public/anonymous downloads are not enabled. No new data license is implied.
 
@@ -73,16 +74,11 @@ for inference and descriptors; read actual voxel calibration from each TIFF.
 
 ## 4D: live-cell movies, predicted masks and tracks
 
-Distribution target: [4D folder](https://drive.google.com/drive/folders/1XMFZ6CrQIcQmX7JdBjPRx-hIvt5u_fDB).
-**Upload pending: this folder is not yet a complete dataset download.**
-The local archive passed CRC/member-path/SHA-256 checks, but the connector's
-500 MiB transfers timed out before reaching Drive. The folder's README and
-checksums alone are not the dataset; do not attempt extraction until all
-parts (or a complete replacement ZIP) are present and verified.
-The prepared 12,167,747,775-byte ZIP can be distributed as **24 binary parts**
-(`4D.zip.001` through `4D.zip.024`, at most 500 MiB each), because the upload
-connector accepts at most 512 MiB per file. Once uploaded, download every part and
-`SHA256SUMS`; do not unzip the individual parts.
+Download [4D.zip — 12,167,747,775 bytes (12.17 GB / 11.33 GiB)](https://drive.google.com/file/d/1183tSn6ZAoZal6WO3oM08LSb6Q3TvG3o/view?usp=drivesdk)
+from the [4D folder](https://drive.google.com/drive/folders/1XMFZ6CrQIcQmX7JdBjPRx-hIvt5u_fDB),
+along with [SHA256SUMS](https://drive.google.com/file/d/1Wx2XrUKPYSbWJcdb8pcKrPE8Q6ggjkez/view?usp=drivesdk).
+This is one complete ZIP, **not a multipart archive**. Its remote byte size,
+MD5 and SHA-256 were checked against the local archive after upload.
 
 The package snapshots the finalized batch release on 2026-10-22, including
 integrated track repair: **55 samples** across `chr3` (4), `chr18` (10),
@@ -93,15 +89,16 @@ debugging artifacts, standalone repaired folders and candidate-selection
 experiments are excluded.
 
 ```bash
-# Run in the directory containing all 24 parts (macOS/Linux):
-cat 4D.zip.[0-9][0-9][0-9] > 4D.zip
+# Run beside the downloaded 4D.zip and SHA256SUMS (macOS/Linux):
 shasum -a 256 -c SHA256SUMS
-unzip /path/to/4D.zip -d Dataset
+unzip 4D.zip -d /path/to/ChromoWorld/Dataset
 ```
 
-The reconstructed ZIP SHA-256 is
+The ZIP SHA-256 is
 `efa75b0764b4b111d447f00b7a786cac09c96a7500d9f418d3b65e3a384570eb`.
-CRC integrity and all 1,046 member paths were checked before splitting.
+Its MD5 is `2bfc4d2118986cd72866aafb393c4770`.
+CRC integrity and all 1,046 member paths were checked before upload.
+Allow approximately 42 GB of free disk space for the ZIP and extracted files.
 
 The ZIP has a single `4D/` root; its local source folder was named `release/`:
 

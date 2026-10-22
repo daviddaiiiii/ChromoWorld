@@ -42,8 +42,9 @@ not a GT instance mask. No separate 3D GT-mask export is claimed.
 ## 4D ChromoPose pipeline
 
 The [4D live-cell data package](../../../Dataset/README.md#4d-live-cell-movies-predicted-masks-and-tracks)
-documents 55 movies with image stages, predicted masks, tracks and previews.
-Its Drive upload is pending; consult the dataset guide's availability notice.
+provides 55 movies with image stages, predicted masks, tracks and previews.
+The complete ZIP and checksums are linked in the dataset guide; Drive access
+is required. Its masks and tracks are algorithm outputs, not ground truth.
 Use a DAPI-only input directory; exclude Tag files and GIF/MP4 previews.
 The dataset's masks/tracks are algorithm outputs, not ground-truth identities.
 

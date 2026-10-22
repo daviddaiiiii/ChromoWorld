@@ -186,7 +186,7 @@ official upstream download links and instructions.
 | --- | --- | --- |
 | [2D images + polygons](https://drive.google.com/file/d/1uiI7PR-H7DH77jsTPzEdkelMbMvmqB6x/view?usp=drivesdk) | 3.61 GB ZIP; 13,680 pairs | `Dataset/2D/{train,test}/image` and `label/{Banding,FISH}` |
 | [3D matched DAPI/Tag volumes](https://drive.google.com/file/d/1EoJxi3dP494kBQNJnXOkgXqhCznqACgo/view?usp=drivesdk) | 37.56 GB tar.gz; 1,333 pairs | See the [extracted layout](Dataset/README.md#3d-matched-dapitag-volumes) |
-| [4D live-cell release — upload pending](https://drive.google.com/drive/folders/1XMFZ6CrQIcQmX7JdBjPRx-hIvt5u_fDB) | Prepared 12.17 GB ZIP; 55 movies | `Dataset/4D/{image,mask,mp4}` |
+| [4D live-cell release](https://drive.google.com/file/d/1183tSn6ZAoZal6WO3oM08LSb6Q3TvG3o/view?usp=drivesdk) | 12.17 GB ZIP; 55 movies; 510 TIFF / 480 GIF / 56 MP4 products | `Dataset/4D/{image,mask,mp4}` |
 | ChromoPix / ChromoPose / ChromoLift weights | [ckpt folder](https://drive.google.com/drive/folders/1B4LLQiesGVCVG3aq-7846YpRV52jHJg3) | [Download-to-runtime filename mapping](Checkpoint/README.md) |
 
 [Dataset download links, extracted layouts and contents](Dataset/README.md) ·
@@ -198,8 +198,7 @@ official upstream download links and instructions.
 - **Available:** seven saved UMAP projections and plotting code, curated
   demos, model source and analysis entry points.
 - **External downloads required:** processed 2D images/labels, paired 3D
-  volumes, project and third-party weights. The 4D live-cell archive is
-  prepared locally, but its Drive upload is not complete.
+  volumes, the verified 4D live-cell archive, project and third-party weights.
   Current Drive datasets require access; anonymous downloads are not enabled.
 - **Still needed for complete historical retraining:** Chimps image/mask
   data, historical ChromoLift paired seven-feature records and image conditions,
