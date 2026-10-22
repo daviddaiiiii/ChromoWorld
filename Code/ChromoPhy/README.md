@@ -18,6 +18,13 @@ threshold 0.5, phase-two iterations 200, flow step 0.75, Cellpose follow_flows,
 and no watershed refinement. Labels return to the input's native grid.
 See [segmentation](chromopose/segmentation/README.md).
 
+`chromopose/auto_crop.py` independently trims oversized original DAPI fields
+or redundant registered canvases using a shared all-time XYZ box. It preserves
+native pixels, every timepoint, calibrated spacing, and existing instance IDs;
+aligned masks/Tag files can receive the same box with `--apply-to`. This is not
+denoising, registration, segmentation or tracking repair. See the
+[crop CLI and safety limits](../Analyze/fig5/README.md#standalone-automatic-crop).
+
 ```bash
 python -m pip install -r Code/ChromoPhy/chromopose/requirements.txt
 python Code/ChromoPhy/chromopose/segmentation/infer.py \
@@ -28,6 +35,9 @@ For the full raw-to-tracked workflow, use
 Code/Analyze/fig5/get-4dmask_TIFF2TIFF.py. Legacy mask-assisted affine remains
 an explicit historical route. Tag-specific maintenance utilities are not
 included in the released DAPI movie pipeline.
+Add `--auto-crop` to insert `crop` and `affine_crop` stages; without it the
+existing six core stages remain unchanged. Use a new output directory when
+switching pipeline settings/versions.
 
 ## ChromoLift
 

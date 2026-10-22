@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run raw 4D DAPI through ChromoPose preprocessing, registration, and tracking.
 
-Each *-DAPI.tif input produces one <basename>/ folder containing six stage
-directories. Image stages contain calibrated TZYX intensities; mask stages
-contain TZYX instance labels on the registered image grid.
+Each *-DAPI.tif input produces one <basename>/ folder with six core stages.
+--auto-crop adds lossless crop and affine_crop stages before preprocessing and
+after registration. Image and downstream mask stages share a calibrated grid.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ import tifffile
 HERE = Path(__file__).resolve().parent
 CHROMOPOSE = HERE.parent.parent / "ChromoPhy" / "chromopose"
 DEFAULT_CHECKPOINT = HERE.parents[2] / "Checkpoint" / "ChromoPhy" / "ChromoPose" / "last.pth"
-STAGES = ("raw", "preprocess", "affine", "segment", "post", "track")
-PIPELINE_VERSION = "chromoworld.4d_mask_pipeline.v2"
+STAGES = ("raw", "crop", "preprocess", "affine", "affine_crop", "segment", "post", "track")
+PIPELINE_VERSION = "chromoworld.4d_mask_pipeline.v3"
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,6 +39,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--anchors", type=Path, help="Optional tracker anchors JSON, keyed by sample basename")
     parser.add_argument("--pattern", default="*-DAPI.tif", help="Glob for directory input")
     parser.add_argument("--max-files", type=int, default=0)
+    parser.add_argument("--auto-crop", action="store_true", help="Add exact all-time XYZ crop stages; source raw is retained")
+    parser.add_argument("--crop-margin-xy-um", type=float, default=3.)
+    parser.add_argument("--crop-margin-z-um", type=float, default=1.5)
+    parser.add_argument("--affine-crop-margin-xy-um", type=float, default=2.)
     parser.add_argument("--stop-after", choices=STAGES, default="track", help="Pilot one or more early stages")
     return parser.parse_args()
 
@@ -199,6 +203,9 @@ def process_sample(source: Path, args: argparse.Namespace, anchors: dict[str, An
         "version": PIPELINE_VERSION, "sample": name, "source": file_stat(source),
         "profile": profile, "checkpoint": file_stat(checkpoint) if checkpoint.is_file() else str(checkpoint),
         "gpu_ids": args.gpu_ids, "anchors": file_stat(args.anchors) if args.anchors else None,
+        "auto_crop": {"margin_xy_um": args.crop_margin_xy_um,
+                      "margin_z_um": args.crop_margin_z_um,
+                      "affine_margin_xy_um": args.affine_crop_margin_xy_um} if args.auto_crop else None,
     }
     manifest_path = sample_dir / "pipeline.json"
     if manifest_path.exists():
@@ -218,6 +225,19 @@ def process_sample(source: Path, args: argparse.Namespace, anchors: dict[str, An
         label=False, expected_shape=tuple(original["shape_tzyx"]),
     )
     if args.stop_after == "raw":
+        return
+    if args.auto_crop:
+        raw_path, raw_info = finished_stage(
+            sample_dir, "crop", raw_name,
+            lambda stage: run_command(CHROMOPOSE / "auto_crop.py", "--input", raw_path,
+                                      "--output-dir", stage, "--mode", "raw",
+                                      "--margin-xy-um", str(args.crop_margin_xy_um),
+                                      "--margin-z-um", str(args.crop_margin_z_um)),
+            label=False, expected_shape=None,
+        )
+        if raw_info["shape_tzyx"][0] != original["shape_tzyx"][0]:
+            raise ValueError("Auto crop changed the time axis")
+    if args.stop_after == "crop":
         return
     pre_path, pre_info = finished_stage(
         sample_dir, "preprocess", raw_name,
@@ -241,6 +261,19 @@ def process_sample(source: Path, args: argparse.Namespace, anchors: dict[str, An
         raise ValueError("Affine changed time count")
     if args.stop_after == "affine":
         return
+    if args.auto_crop:
+        affine_path, affine_info = finished_stage(
+            sample_dir, "affine_crop", raw_name,
+            lambda stage: run_command(CHROMOPOSE / "auto_crop.py", "--input", affine_path,
+                                      "--output-dir", stage, "--mode", "registered",
+                                      "--margin-xy-um", str(args.affine_crop_margin_xy_um),
+                                      "--margin-z-um", str(args.crop_margin_z_um)),
+            label=False, expected_shape=None,
+        )
+        if affine_info["shape_tzyx"][0] != count:
+            raise ValueError("Registered crop changed the time axis")
+    if args.stop_after == "affine_crop":
+        return
     if not checkpoint.is_file():
         raise FileNotFoundError(f"ChromoPose checkpoint not found: {checkpoint}")
     mask_shape = tuple(affine_info["shape_tzyx"])
@@ -258,7 +291,7 @@ def process_sample(source: Path, args: argparse.Namespace, anchors: dict[str, An
     _, _ = finished_stage(
         sample_dir, "post", post_name,
         lambda stage: run_command(CHROMOPOSE / "postprocess.py", "--masks", sample_dir / "segment",
-                                  "--raw", sample_dir / "affine", "--output", stage,
+                                  "--raw", affine_path.parent, "--output", stage,
                                   "--pattern", segment_name, "--no-preview", "--workers", "1"),
         label=True, expected_shape=mask_shape,
     )
@@ -284,6 +317,11 @@ def main() -> None:
         args.anchors = args.anchors.expanduser().resolve()
     if args.max_files < 0:
         raise SystemExit("--max-files must be nonnegative")
+    if args.stop_after in ("crop", "affine_crop") and not args.auto_crop:
+        raise SystemExit("--stop-after crop/affine_crop requires --auto-crop")
+    if not all(np.isfinite(x) and x >= 0 for x in
+               (args.crop_margin_xy_um, args.crop_margin_z_um, args.affine_crop_margin_xy_um)):
+        raise SystemExit("Crop margins must be finite and nonnegative")
     if not CHROMOPOSE.is_dir():
         raise SystemExit(f"ChromoPose code not found: {CHROMOPOSE}")
     files = source_files(args.input, args.pattern, args.max_files)

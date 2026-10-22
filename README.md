@@ -91,6 +91,10 @@ The released movie workflow runs **raw / preprocess / affine / segment /
 post / track** in that order. ChromoPose resizes frames internally for model
 inference and restores instance labels to the affine image grid with
 nearest-neighbor interpolation before downstream processing.
+Optional `--auto-crop` inserts a native-grid, all-time XYZ crop before
+preprocessing and after registration; it never resamples intensities or labels.
+The independent [auto-crop CLI](Code/Analyze/fig5/README.md#standalone-automatic-crop)
+also supports applying one DAPI-derived box to already aligned mask/Tag TIFFs.
 
 [ChromoPose training and inference](Code/ChromoPhy/chromopose/segmentation/README.md) ·
 [Full 4D pipeline](Code/Analyze/fig5/README.md) ·

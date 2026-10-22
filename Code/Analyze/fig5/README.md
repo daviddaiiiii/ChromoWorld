@@ -45,6 +45,27 @@ python Code/Analyze/fig5/get-4dmask_TIFF2TIFF.py \
   --input /data/raw_movies --output-dir /output/Fig5/4D --gpu-ids 0
 ```
 
+For oversized raw fields or redundant registered canvases, add `--auto-crop`:
+
+```bash
+python Code/Analyze/fig5/get-4dmask_TIFF2TIFF.py \
+  --input /data/raw_movies --output-dir /output/Fig5/4D_cropped \
+  --auto-crop --gpu-ids 0
+```
+
+This adds `crop` after the retained original `raw`, and `affine_crop` after
+`affine`. Preprocessing uses `crop`; segmentation and postprocessing use
+`affine_crop`, so every downstream mask stays on that exact grid. The optional
+stages preserve every T and use one all-time XYZ bounding box. A crop is an
+index slice, never another interpolation. Affine transforms use the cropped
+input's voxel-zero physical coordinate frame; the raw crop report maps that
+frame back to the original input. The `affine_crop` origin is relative to the
+registered anchor frame, not a microscope stage coordinate. Keep both crop
+reports and `affine/transforms.json` when mapping coordinates across stages.
+No rotation/translation constraints change.
+Use `--stop-after crop` or `--stop-after affine_crop` for a no-model pilot.
+Old stage manifests are not silently reused across pipeline versions/settings.
+
 Each sample receives a basename directory with raw, preprocess, affine,
 segment, post, and track TIFFs plus pipeline/stage reports.
 Affine estimates rigid motion from DAPI before segmentation. Segment/post/track
@@ -60,6 +81,71 @@ route remains an explicit historical option in chromopose/affine.py.
 
 Chimps training movies are not currently in Dataset; the retained
 demo_outputs illustrate past outputs.
+
+## Standalone automatic crop
+
+```bash
+# Any TIFF basenames; calibration is read from OME or ImageJ/shaped metadata.
+python Code/ChromoPhy/chromopose/auto_crop.py \
+  --input /data/original_dapi --output-dir /output/raw_crop
+
+# Trim a registered canvas; keep existing intensities, axes and voxel sizes.
+python Code/ChromoPhy/chromopose/auto_crop.py \
+  --input /data/registered/sample.tif --output-dir /output/registered_crop \
+  --mode registered
+
+# Apply exactly that box to an ALREADY ALIGNED label/Tag TIFF, without relabeling.
+python Code/ChromoPhy/chromopose/auto_crop.py \
+  --input /data/registered/sample-DAPI.tif --output-dir /output/matched_crop \
+  --mode registered --apply-to /data/registered/sample-mask.tif
+```
+
+Defaults are 3 µm XY / 1.5 µm Z margins for raw, and 2 µm XY / 1.5 µm Z
+for registered inputs; margins are clipped at existing FOV boundaries. XY is
+expanded toward a physical square, never padded beyond the source FOV.
+`--no-square-xy` disables that expansion; `--axes-to-crop z` leaves XY intact.
+No target frame count, chromosome count, or largest-component-only rule is used.
+
+Detection uses smoothed DAPI with absolute eight-voxel high-signal seeds, weak
+signal propagation, and a per-frame 99.8% background/noise-subtracted signal-mass
+guard. These heuristics locate a conservative box, not a GT foreground mask.
+Uncertain frames force a larger/full box; constant frames retain their T slot.
+Margins and retained-signal fraction are configurable. Dim structures below
+the detection noise floor can still be missed: inspect the `_crop.json` bounds
+and a pilot before a production batch. A crop cannot recover an already clipped
+object or reproduce every detail of the historical patient wrapper.
+
+Supported axes are ZYX/TZYX and CZYX/ZCYX/TCZYX/TZCYX. Multi-channel input requires
+`--channel INDEX` for DAPI detection; **all channels remain in the output**.
+Multi-series TIFFs must first be exported as the intended single movie; the
+script refuses to silently discard additional image series.
+Use `--axes TZYX` only when you know an ambiguous input's true axis order, and
+`--spacing-zyx Z Y X` in µm only when calibration is externally known. No pixel
+spacing is invented. Native dtype and exact slice values are verified after
+writing. Cropped outputs use calibrated shaped-TIFF metadata with an updated
+`origin_zyx_um`; time interval and channel names are retained when available.
+Without a supplied origin, the recorded origin is explicitly local to the
+source voxel grid, not a claimed stage/world coordinate.
+
+Companions must have the same TZYX grid/spacing (and equal explicit origins).
+Equal grids alone do not prove alignment: `--apply-to` is a user assertion that
+the files already correspond. A companion missing an origin inherits an
+explicit DAPI origin, with that assumption recorded; a companion-only explicit
+origin is rejected rather than silently mixing coordinate systems.
+Tag never drives crop detection. Inputs and
+existing outputs are never overwritten. Only numpy/scipy/tifffile are required.
+
+CPU-only regression tests (synthetic temporary TIFFs, no weights required):
+
+```bash
+python -m unittest discover -s Code/ChromoPhy/chromopose/tests -v
+```
+
+Crop detection does not replace preprocessing's foreground/intensity repair,
+registration's optimizer, or post-tracking motion repair. In particular, the
+standalone patient `repair_tracks.py` examines raw-motion-supported temporal
+links/fragments/gaps after tracking; it is not a crop or segmentation operation
+and is not added to the released pipeline by this change.
 
 ## Fixed front/back TIFF-to-GIF visualization
 
