@@ -1811,6 +1811,12 @@ def main():
             target=directory/path.name
             report=repair_existing(initial_path,raw_path,path,target,
                 (args.evidence_cache or args.output/"flow_cache")/(category or "root")/name, report_path)
+            if gif:
+                repaired_gif=args.output/"gif"/(category or "root")/f"{name}.gif"
+                repaired_gif.parent.mkdir(parents=True,exist_ok=True)
+                report["gif"]=gif._mask_gif(target,repaired_gif,
+                    SimpleNamespace(duration_seconds=args.duration_seconds,fps=None,max_size=args.gif_max_size))
+                _evidence_save(report_path,report)
             reports.append(report);continue
         extra_stamps={}
         for key,extra in [('raw',raw_path),('initial_tracking',initial_path)]:
@@ -1882,7 +1888,7 @@ def main():
                 report,nodes,mapping=_refresh_evidence_tables(tracked,arr,report)
                 report["version"]=VERSION
             del raw,removed
-        report.update(source_stamp=source_stamp,config_stamp=movie_stamp,category=category,
+        report.update(version=run_version,source_stamp=source_stamp,config_stamp=movie_stamp,category=category,
             spacing_um=spacing.tolist() if spacing is not None else None,
             anchor_supplied=name in anchors,source_pipeline=meta.get("pipeline"))
         metadata={k:v for k,v in meta.items() if k!="shape"}
