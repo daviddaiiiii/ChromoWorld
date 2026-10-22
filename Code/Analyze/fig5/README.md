@@ -144,10 +144,38 @@ python -m unittest discover -s Code/ChromoPhy/chromopose/tests -v
 ```
 
 Crop detection does not replace preprocessing's foreground/intensity repair,
-registration's optimizer, or post-tracking motion repair. In particular, the
-standalone patient `repair_tracks.py` examines raw-motion-supported temporal
-links/fragments/gaps after tracking; it is not a crop or segmentation operation
-and is not added to the released pipeline by this change.
+registration's optimizer, or tracking. Raw-aware `chromopose/track.py` now ends
+with independent bidirectional 3D TV-L1 evidence repair (v3.3). The 4D pipeline
+passes the matched registered/preprocessed intensity movie to that entry point.
+No separate `repair_tracks.py` is needed. `--skip-evidence-repair` reproduces the
+previous temporal-refinement stage without this final repair.
+
+To repair existing tracking without rerunning the heuristic matcher:
+
+```bash
+python Code/ChromoPhy/chromopose/track.py \
+  --repair-existing --input /data/mask/chrp3d_post \
+  --initial-tracks /data/mask/chrp3d_post_tracked \
+  --raw /data/image/raw_pre/tiff --output /output/reviewed_tracking
+```
+
+Use the affine post masks, affine tracks and affine intensity movies together
+for the registered counterpart. Inputs remain read-only; output must be a
+different directory. Direct TIFFs and `chr3/chr18/others/patients` subdirectories
+are supported, with calibrated OME or shaped/ImageJ TZYX TIFFs. DAPI names are
+`{sample}-DAPI.tif`; existing tracks may be `{sample}.tif` or legacy
+`{sample}_tracked.tif`. Do not mix coordinate grids.
+
+Repair changes a link only when raw motion supports a clearly better match,
+and uses two-sided evidence for fragment absorption/short-gap reassignment.
+It preserves the exact observed foreground: no synthesized or deleted voxels,
+no 46/92 count target, no forced full-T tracks. Local and movie-wide physical
+regression gates can retain the original solution. These checks are not a
+biological accuracy guarantee; unresolved links remain in the JSON audit.
+Flow caches and audits live in the output directory (or `--evidence-cache`),
+not in the input data. Acquisition intervals are read only when calibrated;
+otherwise matching is in frame units. Synthetic tests are not an accuracy
+benchmark on real chromosome identities.
 
 ## Fixed front/back TIFF-to-GIF visualization
 

@@ -10,7 +10,9 @@ partitions are explicitly uncertain hypotheses, NOT recovered ground truth.
 Optional DAPI-guided temporal refinement reconnects reliable tracklets, selects
 bidirectionally supported compound partitions, absorbs minor fragments and
 quarantines low-support specks. No foreground is added; source files are read-only.
-Use --raw RAW_TIFF_ROOT --initial-tracks TRACKED_ROOT to refine existing tracking.
+Raw-aware tracking ends with an independent bidirectional TV-L1 evidence gate.
+Use --repair-existing --raw RAW_TIFF_ROOT --initial-tracks TRACKED_ROOT to
+repair any released tracking version without rerunning the heuristic tracker.
 
 Dependencies: numpy, scipy, tifffile, scikit-image (DAPI-guided refinement).
 GIF rendering is imported separately. A final regression guard selects unchanged
@@ -24,6 +26,9 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
+import tempfile
+import xml.etree.ElementTree as ET
 import sys
 import time
 from collections import Counter, defaultdict
@@ -39,8 +44,9 @@ from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 
 BASE_VERSION = "motion-shape-latent-tracking-2.1"
-VERSION = "motion-shape-temporal-refinement-3.2"
-CATEGORIES = ("chr3", "chr18", "others")
+VERSION = "motion-shape-evidence-tracking-3.3"
+TEMPORAL_VERSION = "motion-shape-temporal-refinement-3.2"
+CATEGORIES = ("chr3", "chr18", "others", "patients")
 MAX_GAP = 2
 POINTS = 384
 
@@ -1123,29 +1129,612 @@ def _write_csv(path,rows):
 
 
 def _read_metadata(path):
-    with tifffile.TiffFile(path) as tf:
-        meta=dict(tf.imagej_metadata or {})
+    """Read physical calibration/provenance from OME or shaped/ImageJ TIFFs."""
+    units = {"µm": 1., "μm": 1., "um": 1., "micron": 1., "microns": 1., "nm": .001, "mm": 1000.}
+    with tifffile.TiffFile(path) as handle:
+        meta = dict(handle.imagej_metadata or {})
         if not meta:
-            try:meta=json.loads(tf.pages[0].description or "{}")
-            except (ValueError,TypeError):meta={}
-        tags=tf.pages[0].tags;resolution=None
+            try: meta = json.loads(handle.pages[0].description or "{}")
+            except (ValueError, TypeError): meta = {}
+        if not isinstance(meta, dict): meta = {}
+        tags = handle.pages[0].tags
+        resolution = None
         if "XResolution" in tags and "YResolution" in tags:
-            xr,yr=tags["XResolution"].value,tags["YResolution"].value
-            resolution=(xr[0]/xr[1],yr[0]/yr[1])
-        unit=tags["ResolutionUnit"].value if "ResolutionUnit" in tags else None
-    spacing=None
-    if resolution and meta.get("unit") in ("micron","um","µm") and "spacing" in meta:
-        spacing=np.array([meta["spacing"],1/resolution[1],1/resolution[0]],float)
-        if not np.all(np.isfinite(spacing)) or np.any(spacing<=0):raise ValueError("Invalid spacing")
-    return meta,resolution,unit,spacing
+            xr, yr = tags["XResolution"].value, tags["YResolution"].value
+            resolution = (xr[0]/xr[1], yr[0]/yr[1])
+        unit = tags["ResolutionUnit"].value if "ResolutionUnit" in tags else None
+        spacing = None
+        if handle.ome_metadata:
+            root = ET.fromstring(handle.ome_metadata)
+            image = next(e for e in root.iter() if e.tag.split("}")[-1] == "Image")
+            px = next(e for e in image if e.tag.split("}")[-1] == "Pixels")
+            for e in image:
+                if e.tag.split("}")[-1] == "Description" and e.text:
+                    try:
+                        extra = json.loads(e.text)
+                        if isinstance(extra, dict): meta.update(extra)
+                    except ValueError: meta["original_description"] = e.text
+            values = [px.get("PhysicalSize"+a) for a in "ZYX"]
+            if all(v is not None for v in values):
+                spacing = np.array([float(v)*units[px.get("PhysicalSize"+a+"Unit", "µm")] for a,v in zip("ZYX",values)])
+                # Also usable by shaped-TIFF output of the base tracker.
+                meta.update(unit="micron", spacing=float(spacing[0]))
+                resolution = (1/spacing[2], 1/spacing[1]); unit = "NONE"
+            if px.get("TimeIncrement"):
+                time_units = {"s": 1., "ms": .001, "min": 60., "h": 3600.}
+                time_unit = px.get("TimeIncrementUnit", "s")
+                if time_unit in time_units:
+                    meta["finterval"] = float(px.get("TimeIncrement"))*time_units[time_unit]
+            meta["channel_names"] = [e.get("Name", "") for e in px if e.tag.split("}")[-1]=="Channel"]
+        elif resolution and meta.get("unit") in units and "spacing" in meta:
+            spacing = np.array([meta["spacing"],1/resolution[1],1/resolution[0]],float)*units[meta["unit"]]
+        if spacing is not None and (not np.all(np.isfinite(spacing)) or np.any(spacing<=0)):
+            raise ValueError("Invalid physical ZYX spacing")
+    return meta, resolution, unit, spacing
 
 
 def _sha(path):
     h=hashlib.sha256()
-    with path.open("rb") as f:
+    with Path(path).open("rb") as f:
         for block in iter(lambda:f.read(8*1024*1024),b""):h.update(block)
     return h.hexdigest()
 
+
+
+# Independent evidence repair is deliberately separate from the heuristic base
+# matcher, but lives in this public entry point (no patient-specific overrides).
+EVIDENCE_VERSION = "raw-motion-evidence-gated-repair-1.1"
+EVIDENCE_MOTION_VERSION = "raw-motion-evidence-gated-repair-1.0"
+EVIDENCE_POINTS = 768
+
+
+def _evidence_save(path, data):
+    path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, prefix=path.name+".",
+                                     suffix=".writing", delete=False) as stream:
+        pending = Path(stream.name)
+        try:
+            json.dump(data, stream, indent=2, allow_nan=False)
+        except BaseException:
+            pending.unlink(missing_ok=True)
+            raise
+    try:
+        os.replace(pending, path)
+    finally:
+        pending.unlink(missing_ok=True)
+
+
+def _evidence_read_movie(path):
+    with tifffile.TiffFile(path) as handle:
+        if handle.series[0].axes not in ("TZYX", "ZYX"):
+            raise ValueError(f"Explicit TZYX/ZYX axes required: {path}")
+    try:
+        data = tifffile.memmap(path, mode="r")
+    except (ValueError, TypeError):
+        data = tifffile.imread(path, maxworkers=2)
+    return data[None] if data.ndim == 3 else data
+
+
+def _refresh_evidence_tables(tracked, source, report):
+    result = dict(report); nodes = []; mapping = []; frames = []; lengths = Counter(); history = defaultdict(list)
+    for t, (native, frame) in enumerate(zip(source, tracked)):
+        poses = _objects(frame, np.asarray(report['distance_axis_scale']))
+        src = _objects(native, np.asarray(report['distance_axis_scale']))
+        for identity, o in poses.items():
+            lengths[identity] += 1
+            history[identity].append(t)
+            nodes.append(dict(movie=report['movie'], t=t, track_id=identity,
+                volume_voxels=o.volume, centroid_z=float(o.center[0]),
+                centroid_y=float(o.center[1]), centroid_x=float(o.center[2]),
+                candidate_identity=True, selection='final_evidence_gated'))
+        for label, owners in _ownership(native, frame, src).items():
+            for identity, count in owners.items():
+                mapping.append(dict(t=t, source_label=label, track_id=identity,
+                    voxels=count, fraction=count/src[label].volume,
+                    compound_partition=len(owners)>1))
+        frames.append(dict(t=t, source_instances=len(src), tracked_instances=len(poses),
+            foreground_voxels=int(np.count_nonzero(frame)),
+            removed_voxels=int(np.count_nonzero((native>0)&(frame==0)))))
+    values = list(lengths.values())
+    runs = []
+    for identity, present in history.items():
+        runs.append(max((len(run) for run in np.split(present, np.flatnonzero(np.diff(present)>1)+1)), default=0))
+    result.update(per_frame=frames, allocated_ids=int(tracked.max(initial=0)),
+        track_segments=len(lengths), track_length=dict(
+            mean=float(np.mean(values)) if values else 0., median=float(np.median(values)) if values else 0.,
+            one_frame=sum(v==1 for v in values), one_frame_fraction=sum(v==1 for v in values)/max(1,len(values)),
+            longest_contiguous_mean=float(np.mean(runs)) if runs else 0.,
+            longest_contiguous_median=float(np.median(runs)) if runs else 0.))
+    return result, nodes, mapping
+
+
+def evidence_repair(initial, signal, post, spacing, cache, fingerprint):
+    """Return repaired labels and an audit; exact observed foreground is fixed.
+
+    The independent bidirectional raw flow can override only poor associations.
+    Body reassignment must pass local and movie-wide physical regression gates.
+    Uncertain births/deaths and ambiguous links are retained, not forced full-T.
+    post may be an array or a TIFF path on the same calibrated voxel grid.
+    """
+    spacing = np.asarray(spacing, float)
+    if (initial.ndim != 4 or initial.shape != signal.shape or spacing.shape != (3,)
+            or not np.all(np.isfinite(spacing)) or np.any(spacing <= 0)):
+        raise ValueError("Equal TZYX grids and positive physical ZYX spacing required")
+    if not np.issubdtype(initial.dtype, np.integer) or initial.min() < 0:
+        raise ValueError("Tracked labels must be nonnegative integers")
+    motion = _evidence_Motion(signal, spacing, cache, fingerprint)
+    before = _evidence_metrics(initial, spacing, motion)
+    candidate, links, uncertain, mapping = _evidence_repair_links(initial, spacing, motion)
+    linked = candidate
+    candidate, fragments = _evidence_absorb_transient_fragments(candidate, signal, post, spacing, motion)
+    candidate, gaps, rejected = _evidence_restore_gaps(candidate, spacing, motion)
+    after = _evidence_metrics(candidate, spacing, motion)
+    decisions = []
+    def safe(stats):
+        return all(len(stats[k]) <= len(before[k]) for k in (
+            "reliable_poor_links", "raw_flow_jumps_over_1um",
+            "volume_changes_over_3fold", "substantial_disconnected_id_frames"))
+    if not safe(after):
+        altstats = _evidence_metrics(linked, spacing, motion)
+        if safe(altstats):
+            candidate = linked; after = altstats; fragments = []; gaps = []
+            decisions.append("body_reassignment_rejected; associations_only_retained")
+        else:
+            candidate = initial.copy(); after = before
+            links = []; fragments = []; gaps = []; mapping = []
+            decisions.append("candidate_rejected; original_tracks_retained")
+    if not np.array_equal(initial > 0, candidate > 0):
+        raise AssertionError("Repair must not erase or invent foreground")
+    report = dict(version=EVIDENCE_VERSION, before=before, after=after,
+        link_events=links, fragment_events=fragments, gap_events=gaps,
+        rejected_gaps=rejected, unresolved=uncertain, track_paths=mapping,
+        decisions=decisions, foreground_added=0, foreground_removed=0,
+        labels_changed_voxels=int(np.count_nonzero(initial != candidate)),
+        hard_count_constraint=False, full_lifetime_constraint=False)
+    return candidate, report
+
+
+def _write_evidence_tiff(source, output, data, provenance):
+    """Preserve original spatial/time metadata; no resampling of mask voxels."""
+    meta, resolution, unit, spacing = _read_metadata(source)
+    output = Path(output); output.parent.mkdir(parents=True, exist_ok=True)
+    with tifffile.TiffFile(source) as handle:
+        original_dtype = handle.series[0].dtype
+        xml = handle.ome_metadata
+    if data.max(initial=0) <= np.iinfo(original_dtype).max:
+        data = data.astype(original_dtype, copy=False)
+    pending = output.with_name(output.stem + ".writing.tif")
+    common = dict(bigtiff=True, compression="zlib", compressionargs={"level": 1},
+                  maxworkers=2, photometric="minisblack", resolution=resolution,
+                  resolutionunit=unit)
+    if xml:
+        root = ET.fromstring(xml)
+        image = next(e for e in root.iter() if e.tag.split("}")[-1] == "Image")
+        ns = image.tag.rsplit("}", 1)[0] + "}" if "}" in image.tag else ""
+        desc = next((e for e in image if e.tag.split("}")[-1] == "Description"), None)
+        if desc is None:
+            desc = ET.Element(ns + "Description"); image.insert(0, desc)
+        try:
+            original = json.loads(desc.text or "{}")
+            if not isinstance(original, dict): original = {"original_description": desc.text}
+        except ValueError:
+            original = {"original_description": desc.text}
+        original["tracking_evidence_repair"] = provenance
+        desc.text = json.dumps(original)
+        pixels = next(e for e in image if e.tag.split("}")[-1] == "Pixels")
+        pixels.set("Type", np.dtype(data.dtype).name)
+        tifffile.imwrite(pending, data, ome=False, metadata=None,
+                         description=ET.tostring(root, encoding="ascii").decode("ascii"), **common)
+    else:
+        meta = {k: v for k, v in meta.items() if k not in ("shape", "images", "slices", "frames", "channels", "hyperstack")}
+        meta.update(axes="TZYX", tracking_evidence_repair=provenance)
+        tifffile.imwrite(pending, data, metadata=meta, **common)
+    saved = _evidence_read_movie(pending)
+    if not np.array_equal(saved, data):
+        raise AssertionError("Repaired TIFF round-trip failure")
+    _, _, _, saved_spacing = _read_metadata(pending)
+    if not np.allclose(saved_spacing, spacing, rtol=1e-8):
+        raise AssertionError("Repaired TIFF calibration changed")
+    del saved
+    os.replace(pending, output)
+
+
+def repair_existing(mask, raw, post, output, cache, audit):
+    """Repair a single existing movie into a separate, verified destination."""
+    tick = time.monotonic()
+    mask, raw, post, output, cache, audit = map(Path, (mask, raw, post, output, cache, audit))
+    if output.resolve() in {p.resolve() for p in (mask, raw, post)}:
+        raise ValueError("Repair output must differ from all read-only inputs")
+    inputs = {str(p): _sha(p) for p in (mask, raw, post)}
+    if output.exists() != audit.exists():
+        raise ValueError("Incomplete existing output/audit pair; inspect instead of overwriting")
+    if output.exists():
+        old = json.loads(audit.read_text())
+        if (old["version"] == EVIDENCE_VERSION and old["input_hashes"] == inputs
+                and _sha(output) == old["output_sha256"]):
+            return old
+        raise ValueError("Existing repair belongs to a different verified run")
+    calibrations = [_read_metadata(p) for p in (mask, raw, post)]
+    spacings = [c[3] for c in calibrations]
+    if any(s is None for s in spacings) or not all(np.allclose(spacings[0], s, rtol=1e-5) for s in spacings[1:]):
+        raise ValueError("Matched, calibrated mask/raw/post grids required")
+    # Reject conflicting explicit world origins when both are supplied.
+    def origin(meta):
+        return meta.get("origin_zyx_um", (meta.get("source_geometry") or {}).get("origin_zyx_um"))
+    origins = [origin(c[0]) for c in calibrations]
+    known = [o for o in origins if o is not None]
+    if any(not np.allclose(known[0], o, atol=1e-6) for o in known[1:]):
+        raise ValueError("Mask/raw/post explicit origins differ")
+    initial = _evidence_read_movie(mask); signal = _evidence_read_movie(raw)
+    with tifffile.TiffFile(post) as handle:
+        shape = handle.series[0].shape
+        if handle.series[0].axes == "ZYX": shape = (1, *shape)
+        if shape != initial.shape: raise ValueError("Post grid differs from tracking")
+    candidate, report = evidence_repair(initial, signal, post, spacings[0], cache, inputs[str(raw)])
+    provenance = dict(version=EVIDENCE_VERSION, input_sha256=inputs[str(mask)],
+        raw_sha256=inputs[str(raw)], hard_count_constraint=False, full_lifetime_constraint=False,
+        observed_foreground_preserved=True, events=sum(len(report[k]) for k in ("link_events","fragment_events","gap_events")))
+    _write_evidence_tiff(mask, output, candidate, provenance)
+    if any(_sha(p) != h for p, h in inputs.items()):
+        raise AssertionError("Read-only repair inputs changed")
+    report.update(output=str(output), output_sha256=_sha(output), input_hashes=inputs,
+        shape=list(initial.shape), spacing_zyx_um=spacings[0].tolist(),
+        seconds=time.monotonic()-tick, original_inputs_unchanged=True)
+    _evidence_save(audit, report)
+    print("VERIFIED", mask.name, "changed", report["labels_changed_voxels"],
+          "gaps", report["before"]["interior_gap_frames"], report["after"]["interior_gap_frames"], flush=True)
+    return report
+
+@dataclass
+class _evidence_Object:
+    label:int
+    volume:int
+    center:np.ndarray
+    cloud:np.ndarray
+    shape:np.ndarray
+    lo:np.ndarray
+    hi:np.ndarray
+
+def _evidence_objects(frame,spacing):
+    out={}
+    for label,sl in enumerate(ndi.find_objects(frame),1):
+        if sl is None:continue
+        xyz=np.argwhere(frame[sl]==label);origin=np.array([s.start for s in sl])
+        cloud=(xyz[np.linspace(0,len(xyz)-1,min(EVIDENCE_POINTS,len(xyz)),dtype=int)]+origin).astype(float)
+        centered=(cloud-cloud.mean(0))*spacing
+        shape=np.sqrt(np.maximum(np.linalg.eigvalsh(centered.T@centered/max(1,len(cloud))),1e-6))
+        out[label]=_evidence_Object(label,len(xyz),xyz.mean(0)+origin,cloud,shape,origin,np.array([s.stop-1 for s in sl]))
+    return out
+
+class _evidence_Motion:
+    def __init__(self,raw,spacing,cache,fingerprint):
+        from skimage.registration import optical_flow_tvl1
+        self.spacing=spacing;cache=Path(cache);cache.mkdir(parents=True,exist_ok=True)
+        meta=cache/'cache.json';key=dict(version=EVIDENCE_MOTION_VERSION,raw_sha256=fingerprint,shape=list(raw.shape),spacing=spacing.tolist(),coarse_um=.35)
+        if meta.exists():assert json.loads(meta.read_text())==key,'Refuse stale flow cache'
+        else:_evidence_save(meta,key)
+        coarse_path=cache/'coarse.npz'
+        if coarse_path.exists():coarse=np.load(coarse_path)['raw']
+        else:
+            zoom=np.minimum(1.,spacing/.35);frames=[]
+            for t,v in enumerate(raw):
+                small=ndi.zoom(ndi.gaussian_filter(v.astype(np.float32),np.array([.13,.07,.07])/spacing),zoom,order=1,prefilter=False)
+                positive=small[small>0]
+                lo,hi=np.percentile(positive,[2,99.8]) if len(positive) else (0,1)
+                frames.append(np.clip((small-lo)/max(1,hi-lo),0,1).astype(np.float32))
+            coarse=np.stack(frames);np.savez_compressed(coarse_path,raw=coarse)
+        self.factors=np.divide(np.array(coarse.shape[1:])-1, np.maximum(1,np.array(raw.shape[1:])-1))
+        self.factors=np.maximum(self.factors,1e-8)
+        self.forward=[];self.backward=[]
+        for t in range(len(raw)-1):
+            for a,b,dest,name in [(t,t+1,self.forward,f'f{t:02d}.npy'),(t+1,t,self.backward,f'b{t:02d}.npy')]:
+                path=cache/name
+                if path.exists():flow=np.load(path)
+                else:
+                    tick=time.monotonic()
+                    flow=optical_flow_tvl1(coarse[a],coarse[b],attachment=15,tightness=.3,num_warp=4,num_iter=8,prefilter=True)
+                    pending=path.with_suffix('.writing.npy');np.save(pending,flow);os.replace(pending,path)
+                    print('FLOW',a,b,'seconds',round(time.monotonic()-tick,1),flush=True)
+                assert flow.shape==(3,*coarse.shape[1:]);dest.append(flow)
+
+    def displace(self,points,field):
+        coords=(points*self.factors).T
+        return np.column_stack([ndi.map_coordinates(field[k],coords,order=1,mode='nearest',prefilter=False)/self.factors[k] for k in range(3)])
+
+    def transport(self,points,t,q):
+        p=points.copy().astype(float);cycle=np.zeros(len(p));direction=1 if q>t else -1
+        for a in range(t,q,direction):
+            f=self.forward[a] if direction==1 else self.backward[a-1]
+            opposite=self.backward[a] if direction==1 else self.forward[a-1]
+            d=self.displace(p,f);n=p+d;reverse=self.displace(n,opposite)
+            cycle=np.maximum(cycle,np.linalg.norm((d+reverse)*self.spacing,axis=1));p=n
+        return p,cycle
+
+class _evidence_Matcher:
+    def __init__(self,poses,motion):self.poses=poses;self.motion=motion;self.cache={}
+    def score(self,a,b):
+        key=(a,b)
+        if key in self.cache:return self.cache[key]
+        t,i=a;q,j=b;A=self.poses[t][i];B=self.poses[q][j];sp=self.motion.spacing
+        fw,fc=self.motion.transport(A.cloud,t,q);bw,bc=self.motion.transport(B.cloud,q,t)
+        af=fc<=.4;bf=bc<=.4;fg=float(af.mean());bg=float(bf.mean())
+        fd=cKDTree(B.cloud*sp).query(fw[af]*sp)[0] if af.any() else np.array([100.])
+        bd=cKDTree(A.cloud*sp).query(bw[bf]*sp)[0] if bf.any() else np.array([100.])
+        fs=float(np.mean(fd<=.32));bs=float(np.mean(bd<=.32))
+        shift=np.median(fw-A.cloud,axis=0);error=float(np.linalg.norm((B.center-A.center-shift)*sp))
+        ratio=max(A.volume/B.volume,B.volume/A.volume)
+        shape=float(np.mean(np.abs(np.log((A.shape+.03)/(B.shape+.03)))))
+        cost=.55*(2-fs-bs)+.25*min(error/1.0,4)+.18*abs(np.log(ratio))+.08*min(shape,3)
+        result=dict(forward_support=fs,backward_support=bs,forward_reliable=fg,backward_reliable=bg,
+                    error_um=error,volume_fold=float(ratio),shape_change=shape,cost=float(cost))
+        self.cache[key]=result;return result
+
+def _evidence_strong(s):
+    return min(s['forward_support'],s['backward_support'])>=.55 and min(s['forward_reliable'],s['backward_reliable'])>=.70 and s['error_um']<=.70 and s['volume_fold']<=2.2
+
+def _evidence_poor(s):
+    return min(s['forward_reliable'],s['backward_reliable'])>=.65 and max(s['forward_support'],s['backward_support'])<.30 and (s['error_um']>.85 or s['volume_fold']>3.)
+
+def _evidence_metrics(movie,sp,motion):
+    poses=[_evidence_objects(v,sp) for v in movie];history=defaultdict(list);motions=[];folds=[];broken=[]
+    for t,frame in enumerate(poses):
+        for i,o in frame.items():
+            history[i].append(t);sl=tuple(slice(int(a),int(b)+1) for a,b in zip(o.lo,o.hi))
+            cc,n=ndi.label(movie[t][sl]==i,structure=np.ones((3,3,3)));sizes=np.bincount(cc.ravel())[1:]
+            if len(sizes) and 1-sizes.max()/o.volume>=.1:broken.append(dict(t=t,id=i,secondary_fraction=float(1-sizes.max()/o.volume)))
+    matcher=_evidence_Matcher(poses,motion)
+    for t in range(len(movie)-1):
+        for i in set(poses[t])&set(poses[t+1]):
+            s=matcher.score((t,i),(t+1,i));motions.append(dict(t=t,id=i,**s))
+            if s['volume_fold']>3:folds.append(dict(t=t,id=i,fold=s['volume_fold']))
+    gaps=[dict(id=i,missing=[t for t in range(min(ts),max(ts)+1) if t not in ts]) for i,ts in history.items() if len(ts)<max(ts)-min(ts)+1]
+    return dict(all_ids=len(history),full_frame_ids=sum(len(ts)==len(movie) for ts in history.values()),
+        one_frame_ids=sum(len(ts)==1 for ts in history.values()),per_frame_ids=[len(f) for f in poses],
+        interior_gap_ids=len(gaps),interior_gap_frames=sum(len(g['missing']) for g in gaps),
+        raw_flow_jumps_over_1um=[m for m in motions if m['error_um']>1.],
+        reliable_poor_links=[m for m in motions if _evidence_poor(m)],volume_changes_over_3fold=folds,
+        substantial_disconnected_id_frames=broken,interior_gaps=gaps,
+        foreground_voxels=int(np.count_nonzero(movie)),observations=sum(map(len,poses)),
+        median_track_frames=float(np.median([len(ts) for ts in history.values()])) if history else 0.)
+
+def _evidence_repair_links(initial,sp,motion):
+    poses=[_evidence_objects(v,sp) for v in initial];match=_evidence_Matcher(poses,motion);nodes=[(t,i) for t,f in enumerate(poses) for i in f]
+    histories=defaultdict(list)
+    for t,i in nodes:histories[i].append(t)
+    successor={};predecessor={};events=[];uncertain=[]
+    def unlink(a,b):
+        if successor.get(a)==b:successor.pop(a)
+        if predecessor.get(b)==a:predecessor.pop(b)
+    def connect(a,b):assert a not in successor and b not in predecessor;successor[a]=b;predecessor[b]=a
+    # Preserve current hypotheses unless independent raw evidence distinguishes
+    # a better alternative. Low-confidence optical flow does not cut a track.
+    for i,ts in histories.items():
+        for t,q in zip(ts,ts[1:]):
+            a=(t,i);b=(q,i);s=match.score(a,b)
+            connect(a,b)
+            if q-t>3:uncertain.append(dict(type='long_unobserved_interval',a=a,b=b,frames=q-t,score=s))
+    for t in range(len(initial)-1):
+        left=list(poses[t]);right=list(poses[t+1]);cost=np.full((len(left),len(right)),20.)
+        if not left or not right:continue
+        details={}
+        target_centers=np.array([poses[t+1][j].center*sp for j in right])
+        tree=cKDTree(target_centers)
+        for ii,i in enumerate(left):
+            a=(t,i);A=poses[t][i];cloud,_=motion.transport(A.cloud,t,t+1);pred=(A.center+np.median(cloud-A.cloud,axis=0))*sp
+            near=tree.query_ball_point(pred,2.5)
+            if i in poses[t+1]:near=list(set(near+[right.index(i)]))
+            for jj in near:
+                b=(t+1,right[jj]);s=match.score(a,b);details[ii,jj]=s
+                if i==b[1] or _evidence_strong(s):cost[ii,jj]=s['cost']-(.12 if i==b[1] else 0.)
+        proposals=[]
+        for ii in range(len(left)):
+            ordered=np.argsort(cost[ii]);jj=int(ordered[0]);s=details.get((ii,jj))
+            if s is None or not _evidence_strong(s) or right[jj]==left[ii]:continue
+            column=cost[:,jj];back=int(column.argmin())
+            if back!=ii:continue
+            second=float(cost[ii,ordered[1]]) if len(ordered)>1 else 20.
+            second_back=float(np.partition(column,1)[1]) if len(column)>1 else 20.
+            margin=min(second-cost[ii,jj],second_back-cost[ii,jj])
+            if margin<.15:continue
+            proposals.append((ii,jj,float(margin),s))
+        # Displace an existing association only if it was independently _evidence_poor;
+        # never redirect a well-supported competing trajectory to boost counts.
+        for ii,jj,margin,s in sorted(proposals,key=lambda a:-a[2]):
+            a=(t,left[ii]);b=(t+1,right[jj]);oldb=successor.get(a);olda=predecessor.get(b)
+            if oldb and not _evidence_poor(match.score(a,oldb)):continue
+            if olda and not _evidence_poor(match.score(olda,b)):continue
+            if oldb:unlink(a,oldb)
+            if olda:unlink(olda,b)
+            connect(a,b);events.append(dict(type='raw_bidirectional_alias_or_swap_repaired',a=a,b=b,
+                                           old_successor=oldb,old_predecessor=olda,margin=margin,score=s))
+        # Gross teleports lacking any spatial continuation must not reuse an
+        # identity. Require _evidence_strong signal reliability and severe joint failure.
+        for a,b in list(successor.items()):
+            if a[0]!=t:continue
+            s=match.score(a,b)
+            if _evidence_poor(s) and s['error_um']>1.8 and s['volume_fold']>3:
+                unlink(a,b);events.append(dict(type='gross_false_reconnection_split',a=a,b=b,score=s))
+            elif _evidence_poor(s):uncertain.append(dict(type='ambiguous_existing_link_retained',a=a,b=b,score=s))
+    # Link disjoint observed segments through <=2 missing frames. No foreground
+    # is synthesized here. Competing starts/ends and cycle errors constrain it.
+    for gap in (1,2,3):
+        ends=[a for a in nodes if a not in successor];starts=[b for b in nodes if b not in predecessor]
+        proposals=[]
+        for a in ends:
+            eligible=[b for b in starts if b[0]-a[0]==gap]
+            if not eligible:continue
+            A=poses[a[0]][a[1]]
+            warped,_=motion.transport(A.cloud,a[0],a[0]+gap)
+            predicted_center=warped.mean(0)
+            scored=[]
+            for b in eligible:
+                B=poses[b[0]][b[1]]
+                if np.linalg.norm((predicted_center-B.center)*sp)>1.:continue
+                s=match.score(a,b)
+                if _evidence_strong(s):scored.append((s['cost'],b,s))
+            scored.sort(key=lambda x:x[0])
+            if scored and (len(scored)==1 or scored[1][0]-scored[0][0]>=.15):
+                c,b,s=scored[0];proposals.append((c,a,b,s))
+        for c,a,b,s in sorted(proposals,key=lambda a:a[0]):
+            if a in successor or b in predecessor:continue
+            alternatives=[p for p in proposals if p[2]==b and p[1]!=a]
+            if alternatives and min(p[0] for p in alternatives)-c<.15:continue
+            connect(a,b);events.append(dict(type='observed_segment_reconnection',a=a,b=b,missing_frames=gap-1,score=s))
+    paths=[]
+    for node in nodes:
+        if node in predecessor:continue
+        chain=[node]
+        while chain[-1] in successor:chain.append(successor[chain[-1]])
+        assert len({a[0] for a in chain})==len(chain);paths.append(chain)
+    assert sum(map(len,paths))==len(nodes)
+    oldids=sorted(histories);counts=np.zeros((len(paths),len(oldids)));ix={i:j for j,i in enumerate(oldids)}
+    for p,chain in enumerate(paths):
+        for t,i in chain:counts[p,ix[i]]+=poses[t][i].volume
+    # Preserve the most-supported original numeric names without ID reuse.
+    row,col=linear_sum_assignment(-counts);canonical={int(p):oldids[int(j)] for p,j in zip(row,col) if counts[p,j]>0}
+    nextid=int(initial.max())+1
+    for p in range(len(paths)):
+        if p not in canonical:canonical[p]=nextid;nextid+=1
+    lut=[np.arange(int(initial.max())+1,dtype=np.uint32) for _ in initial]
+    for p,chain in enumerate(paths):
+        for t,i in chain:lut[t][i]=canonical[p]
+    output=np.stack([lut[t][v] for t,v in enumerate(initial)])
+    assert np.array_equal(initial>0,output>0)
+    mappings=[dict(id=canonical[p],observations=[list(a) for a in chain]) for p,chain in enumerate(paths)]
+    return output,events,uncertain,mappings
+
+def _evidence_absorb_transient_fragments(movie,raw,post,sp,motion):
+    output=movie.copy();poses=[_evidence_objects(v,sp) for v in movie];hist=defaultdict(list);events=[]
+    for t,obs in enumerate(poses):
+        for i in obs:hist[i].append(t)
+    references={i:float(np.median([poses[t][i].volume for t in ts])) for i,ts in hist.items()}
+    postfile=tifffile.TiffFile(post) if not isinstance(post,np.ndarray) else None
+    postarray=post if isinstance(post,np.ndarray) else None
+    if postfile is not None and (len(postfile.series[0].pages)!=movie.shape[0]*movie.shape[1] or len(postfile.series[0].pages[0].shape)!=2):
+        postarray=_evidence_read_movie(post);postfile.close();postfile=None
+    try:
+        for t,obs in enumerate(poses):
+            native=postarray[t] if postarray is not None else np.stack([p.asarray() for p in postfile.series[0].pages[t*movie.shape[1]:(t+1)*movie.shape[1]]])
+            ordered=sorted(obs,key=lambda i:obs[i].volume)
+            for frag in ordered:
+                if len(hist[frag])>3:continue  # Persistent independent bodies are not automatically absorbed.
+                A=obs[frag]
+                for mother in sorted((i for i in obs if i!=frag),key=lambda i:np.linalg.norm((obs[i].center-A.center)*sp))[:8]:
+                    B=obs[mother];rv=references[mother]
+                    if len(hist[mother])<4 or A.volume>.5*rv or A.volume>.75*B.volume or B.volume>.9*rv:continue
+                    if not .70*rv<=A.volume+B.volume<=1.35*rv:continue
+                    if cKDTree(B.cloud*sp).query(A.cloud*sp)[0].min()>.45:continue
+                    av=native[tuple(A.cloud.astype(int).T)];bv=native[tuple(B.cloud.astype(int).T)]
+                    al,ac=np.unique(av,return_counts=True);bl,bc=np.unique(bv,return_counts=True)
+                    common=(int(al[ac.argmax()])==int(bl[bc.argmax()]) and al[ac.argmax()]>0 and ac.max()>=.8*len(av) and bc.max()>=.7*len(bv))
+                    if not common and A.volume>.25*B.volume:continue
+                    refs=[q for q in hist[mother] if q!=t and abs(q-t)<=2 and frag not in poses[q]]
+                    before=[q for q in refs if q<t];after=[q for q in refs if q>t]
+                    if before and after:refs=[max(before),min(after)]
+                    elif t in (0,len(movie)-1):refs=sorted(refs,key=lambda q:abs(q-t))[:2]
+                    else:continue
+                    if len(refs)<2:continue
+                    scores=[]
+                    for q in refs:
+                        p,cycle=motion.transport(A.cloud,t,q)
+                        support=cKDTree(poses[q][mother].cloud*sp).query(p*sp)[0]
+                        scores.append(float(np.mean((support<=.28)&(cycle<=.35))))
+                    if min(scores)<.75:continue
+                    sl=tuple(slice(int(a),int(b)+1) for a,b in zip(A.lo,A.hi))
+                    region=output[t][sl]==frag
+                    if not region.any():break
+                    output[t][sl][region]=mother
+                    events.append(dict(t=t,type='transient_fragment_absorbed_by_two_pose_parent',fragment=frag,mother=mother,
+                        voxels=int(region.sum()),references=refs,support=scores,shared_post_observation=bool(common),
+                        combined_volume_ratio=(A.volume+B.volume)/rv))
+                    break
+    finally:
+        if postfile is not None:postfile.close()
+    assert np.array_equal(movie>0,output>0)
+    return output,events
+
+def _evidence_reassignment_gate(movie,t,roi,replacement,poses,affected,sp,motion):
+    """Reject an inferred body if it creates motion/volume or connectivity failures.
+
+    Compare all affected IDs at both adjacent boundaries, including newly
+    created observations. Numerical naming and total full-T counts are not used.
+    """
+    trial=movie[t].copy();trial[roi]=replacement
+    trialposes=_evidence_objects(trial,sp)
+    newer=list(poses);newer[t]=trialposes
+    stats=[]
+    for image,p in ((movie[t],poses),(trial,newer)):
+        match=_evidence_Matcher(p,motion);bad=Counter(_evidence_poor=0,jump=0,fold=0,disconnected=0)
+        for i in affected:
+            o=p[t].get(i)
+            if o is not None:
+                sl=tuple(slice(int(a),int(b)+1) for a,b in zip(o.lo,o.hi))
+                cc,n=ndi.label(image[sl]==i,structure=np.ones((3,3,3)))
+                sizes=np.bincount(cc.ravel())[1:]
+                if len(sizes) and 1-sizes.max()/o.volume>=.1:bad['disconnected']+=1
+            for a in (t-1,t):
+                if not 0<=a<len(movie)-1 or i not in p[a] or i not in p[a+1]:continue
+                s=match.score((a,i),(a+1,i))
+                bad['_evidence_poor']+=int(_evidence_poor(s));bad['jump']+=int(s['error_um']>1.)
+                bad['fold']+=int(s['volume_fold']>3.)
+        stats.append(dict(bad))
+    accepted=all(stats[1][k]<=stats[0][k] for k in stats[0])
+    return accepted,trialposes,dict(before=stats[0],after=stats[1])
+
+def _evidence_restore_gaps(movie,sp,motion):
+    poses=[_evidence_objects(v,sp) for v in movie];hist=defaultdict(list);events=[];rejected=[];output=movie.copy()
+    for t,obs in enumerate(poses):
+        for i in obs:hist[i].append(t)
+    for i,times in hist.items():
+        if len(times)<4:continue
+        median=float(np.median([poses[q][i].volume for q in times]))
+        for t in range(min(times)+1,max(times)):
+            if t in times:continue
+            left=max(q for q in times if q<t);right=min(q for q in times if q>t)
+            if max(t-left,right-t)>2:continue
+            clouds=[]
+            for q in (left,right):
+                p,c=motion.transport(poses[q][i].cloud,q,t)
+                if np.mean(c<=.35)<.7:break
+                clouds.append(p[c<=.35])
+            if len(clouds)!=2:continue
+            if np.linalg.norm((clouds[0].mean(0)-clouds[1].mean(0))*sp)>.6:continue
+            lo=np.maximum(0,np.floor(np.min(np.vstack(clouds),axis=0)).astype(int)-np.ceil(.4/sp).astype(int))
+            hi=np.minimum(movie.shape[1:],np.ceil(np.max(np.vstack(clouds),axis=0)).astype(int)+np.ceil(.4/sp).astype(int)+1)
+            roi=tuple(slice(int(a),int(b)) for a,b in zip(lo,hi));patch=output[t][roi];xyz=np.argwhere(patch>0);absolute=xyz+lo
+            if not len(xyz):continue
+            distance=np.max([cKDTree(p*sp).query(absolute*sp)[0] for p in clouds],axis=0)
+            selected=distance<=.22;owners=patch[tuple(xyz.T)]
+            for owner in np.unique(owners[selected]):
+                competitor=[]
+                for q in (left,right):
+                    if owner not in poses[q]:continue
+                    p,c=motion.transport(poses[q][owner].cloud,q,t);p=p[c<=.35]
+                    if len(p):competitor.append(cKDTree(p*sp).query(absolute*sp)[0])
+                if not competitor:selected[owners==owner]=False;continue
+                rival=np.min(competitor,axis=0)
+                selected[(owners==owner)&(distance+.08>=rival)]=False
+            binary=np.zeros(patch.shape,bool);binary[tuple(xyz[selected].T)]=True
+            cc,n=ndi.label(binary,structure=np.ones((3,3,3)))
+            if not n:continue
+            sizes=np.bincount(cc.ravel());sizes[0]=0;binary=cc==sizes.argmax();v=int(binary.sum())
+            if not .3*median<=v<=1.5*median:continue
+            valid=True
+            for owner in np.unique(patch[binary]):
+                own=poses[t][int(owner)].volume;removed=int(np.count_nonzero(binary&(patch==owner)))
+                if removed>.45*own:valid=False
+            if not valid:continue
+            previous,counts=np.unique(patch[binary],return_counts=True)
+            proposed=patch.copy();proposed[binary]=i
+            accepted,newposes,evidence=_evidence_reassignment_gate(output,t,roi,proposed,poses,set(map(int,previous))|{i},sp,motion)
+            if not accepted:
+                rejected.append(dict(t=t,id=i,reason='affected_trajectory_or_connectivity_regression',references=[left,right],voxels=v,gate=evidence))
+                continue
+            patch[binary]=i;poses[t]=newposes
+            events.append(dict(t=t,id=i,type='bracketed_observed_foreground_gap_restored',references=[left,right],voxels=v,
+                previous_owners={str(int(a)):int(b) for a,b in zip(previous,counts)},uncertain_boundary=True,gate=evidence))
+    assert np.array_equal(movie>0,output>0)
+    return output,events,rejected
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -1154,6 +1743,9 @@ def main():
     p.add_argument("--anchors",type=Path);p.add_argument("--gif-script",type=Path)
     p.add_argument("--raw",type=Path,help="Matched preprocessed DAPI TZYX TIFF root; enables temporal refinement")
     p.add_argument("--initial-tracks",type=Path,help="Reuse v2.1 tracking as the initial solution")
+    p.add_argument("--repair-existing", action="store_true", help="Evidence-only repair of existing tracks; requires --raw and --initial-tracks")
+    p.add_argument("--skip-evidence-repair", action="store_true", help="Historical v3.2 behavior without final raw-motion evidence gate")
+    p.add_argument("--evidence-cache", type=Path, help="Reusable raw-only flow cache (default OUTPUT/flow_cache)")
     p.add_argument("--cleanup-only",action="store_true",help="Clean current tracking without rerunning identity inference")
     p.add_argument("--temporal-window",type=int,default=6)
     p.add_argument("--frame-interval-seconds",type=float,help="Only supply a verified acquisition interval")
@@ -1165,6 +1757,8 @@ def main():
     if args.initial_tracks and args.initial_tracks.resolve()==args.output.resolve():p.error("Output must differ from initial tracking")
     if args.initial_tracks and not args.raw:p.error("Initial-track refinement requires matched DAPI")
     if args.cleanup_only and not (args.initial_tracks and args.raw):p.error('Cleanup requires initial tracking and DAPI')
+    if args.repair_existing and not (args.initial_tracks and args.raw):p.error("Evidence repair requires initial tracking and matched raw")
+    if args.repair_existing and (args.cleanup_only or args.skip_evidence_repair):p.error("Conflicting repair modes")
     if args.temporal_window<1 or not 0<=args.worker_index<args.workers:p.error("Invalid temporal window/worker")
     if args.frame_interval_seconds is not None and args.frame_interval_seconds<=0:p.error("Invalid acquisition interval")
     if args.duration_seconds<=0 or args.gif_max_size<0:p.error("Invalid GIF configuration")
@@ -1180,10 +1774,12 @@ def main():
         gif_renderer_sha256=_sha(args.gif_script) if args.gif_script else None,
         gif_duration_seconds=args.duration_seconds,gif_max_size=args.gif_max_size,
         temporal_window=args.temporal_window,frame_interval_seconds=args.frame_interval_seconds,
-        cleanup_only=args.cleanup_only)
+        cleanup_only=args.cleanup_only,repair_existing=args.repair_existing,skip_evidence_repair=args.skip_evidence_repair)
     raw_lookup={}
     if args.raw:
-        for path in args.raw.rglob('*-DAPI.tif'):
+        for path in sorted(args.raw.rglob('*')):
+            if not path.is_file() or path.suffix.lower() not in ('.tif','.tiff'):continue
+            if not path.stem.endswith('-DAPI'):continue
             if any(part.startswith('.') for part in path.relative_to(args.raw).parts):continue
             name=path.stem.removesuffix('-DAPI')
             if name in raw_lookup:p.error(f"Duplicate DAPI name: {name}")
@@ -1206,11 +1802,21 @@ def main():
         raw_path=raw_lookup.get(name)
         if args.raw and raw_path is None:raise ValueError(f"Missing matched DAPI: {name}")
         initial_path=(args.initial_tracks/category if category else args.initial_tracks)/f"{name}_tracked.tif" if args.initial_tracks else None
+        if initial_path and not initial_path.exists():
+            alternatives=[(args.initial_tracks/category if category else args.initial_tracks)/(name+ext) for ext in (".tif",".tiff")]
+            existing=[v for v in alternatives if v.exists()]
+            if len(existing)!=1:raise ValueError(f"Missing or ambiguous initial tracking: {name}")
+            initial_path=existing[0]
+        if args.repair_existing:
+            target=directory/path.name
+            report=repair_existing(initial_path,raw_path,path,target,
+                (args.evidence_cache or args.output/"flow_cache")/(category or "root")/name, report_path)
+            reports.append(report);continue
         extra_stamps={}
         for key,extra in [('raw',raw_path),('initial_tracking',initial_path)]:
             if extra:extra_stamps[key]=dict(path=str(extra),sha256=_sha(extra),mtime_ns=extra.stat().st_mtime_ns)
         movie_stamp=dict(stamp,**extra_stamps)
-        run_version=VERSION if args.raw else BASE_VERSION
+        run_version=(TEMPORAL_VERSION if args.skip_evidence_repair else VERSION) if args.raw else BASE_VERSION
         if args.resume and target.exists() and report_path.exists():
             previous=json.loads(report_path.read_text())
             if (previous.get("version")==run_version and previous.get("source_stamp")==source_stamp
@@ -1268,6 +1874,13 @@ def main():
             np.savez_compressed(qpath,removed=removed,columns=np.array(report['quarantine_columns']))
             _write_csv(args.output/'tables'/f'{name}_compounds.csv',compounds)
             report['quarantine_file']=str((args.published_output or args.output)/qpath.relative_to(args.output))
+            if not args.skip_evidence_repair:
+                tracked, evidence = evidence_repair(tracked,raw,arr,raw_spacing,
+                    (args.evidence_cache or args.output/"flow_cache")/(category or "root")/name, extra_stamps["raw"]["sha256"])
+                report["evidence_repair"]=evidence
+                # Refresh actual saved-ID observation tables after ID changes.
+                report,nodes,mapping=_refresh_evidence_tables(tracked,arr,report)
+                report["version"]=VERSION
             del raw,removed
         report.update(source_stamp=source_stamp,config_stamp=movie_stamp,category=category,
             spacing_um=spacing.tolist() if spacing is not None else None,
@@ -1276,7 +1889,7 @@ def main():
         metadata.update(axes="TZYX",tracking_version=run_version,tracking_anchor_t=report["anchor_frame"],
             tracking_input=str(path),tracking_compound_partitions_uncertain=True,
             tracking_raw=str(raw_path) if raw_path else None,tracking_temporal_refined=bool(raw_path),
-            tracking_foreground_added=False)
+            tracking_foreground_added=False,tracking_evidence_repair=report.get("evidence_repair",{}).get("version"))
         temp=target.with_suffix(".tmp.tif")
         tifffile.imwrite(temp,tracked,compression="zlib",compressionargs={"level":1},maxworkers=2,
             metadata=metadata,resolution=resolution,resolutionunit=unit,photometric="minisblack",bigtiff=True)

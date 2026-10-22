@@ -26,7 +26,7 @@ HERE = Path(__file__).resolve().parent
 CHROMOPOSE = HERE.parent.parent / "ChromoPhy" / "chromopose"
 DEFAULT_CHECKPOINT = HERE.parents[2] / "Checkpoint" / "ChromoPhy" / "ChromoPose" / "last.pth"
 STAGES = ("raw", "crop", "preprocess", "affine", "affine_crop", "segment", "post", "track")
-PIPELINE_VERSION = "chromoworld.4d_mask_pipeline.v3"
+PIPELINE_VERSION = "chromoworld.4d_mask_pipeline.v4"
 
 
 def parse_args() -> argparse.Namespace:
@@ -302,7 +302,8 @@ def process_sample(source: Path, args: argparse.Namespace, anchors: dict[str, An
         anchor_file = stage / "anchors.json"
         save_json(anchor_file, {"anchors": {name: {"representative_t": selected_anchor}}})
         run_command(CHROMOPOSE / "track.py", "--input", sample_dir / "post",
-                    "--output", stage, "--anchors", anchor_file)
+                    "--output", stage, "--anchors", anchor_file,
+                    "--raw", affine_path.parent)
 
     finished_stage(sample_dir, "track", f"{name}_tracked.tif", make_track,
                    label=True, expected_shape=mask_shape)
