@@ -184,11 +184,12 @@ official upstream download links and instructions.
 
 | Package | Current size | Expected local path |
 | --- | --- | --- |
-| 2D train + test, no robustness | About 3.6 GB compressed, sampled estimate | `Dataset/2D/{train,test}/{image,label}` |
-| Matched 3D DAPI/Tag package | 37.56 GB, existing archive | `Dataset/3D/DAPI_Tag_matched_1333pairs.tar.gz` |
+| [2D images + polygons](https://drive.google.com/file/d/1uiI7PR-H7DH77jsTPzEdkelMbMvmqB6x/view?usp=drivesdk) | 3.61 GB ZIP; 13,680 pairs | `Dataset/2D/{train,test}/image` and `label/{Banding,FISH}` |
+| [3D matched DAPI/Tag volumes](https://drive.google.com/file/d/1EoJxi3dP494kBQNJnXOkgXqhCznqACgo/view?usp=drivesdk) | 37.56 GB tar.gz; 1,333 pairs | See the [extracted layout](Dataset/README.md#3d-matched-dapitag-volumes) |
+| [4D live-cell release — upload pending](https://drive.google.com/drive/folders/1XMFZ6CrQIcQmX7JdBjPRx-hIvt5u_fDB) | Prepared 12.17 GB ZIP; 55 movies | `Dataset/4D/{image,mask,mp4}` |
 | ChromoPix / ChromoPose / ChromoLift weights | [ckpt folder](https://drive.google.com/drive/folders/1B4LLQiesGVCVG3aq-7846YpRV52jHJg3) | [Download-to-runtime filename mapping](Checkpoint/README.md) |
 
-[Dataset sizes and publication plan](Dataset/README.md) ·
+[Dataset download links, extracted layouts and contents](Dataset/README.md) ·
 [Checkpoint layout and provenance](Checkpoint/README.md) ·
 [UMAP assets and checksums](Artifacts/README.md)
 
@@ -197,10 +198,13 @@ official upstream download links and instructions.
 - **Available:** seven saved UMAP projections and plotting code, curated
   demos, model source and analysis entry points.
 - **External downloads required:** processed 2D images/labels, paired 3D
-  volumes, project and third-party weights.
+  volumes, project and third-party weights. The 4D live-cell archive is
+  prepared locally, but its Drive upload is not complete.
+  Current Drive datasets require access; anonymous downloads are not enabled.
 - **Still needed for complete historical retraining:** Chimps image/mask
   data, historical ChromoLift paired seven-feature records and image conditions,
-  the fitted ChromoID gallery, and 4D movies/manifests.
+  the fitted ChromoID gallery, and historical per-run manifests not distributed
+  with the current 4D TIFF/GIF/MP4 release.
 
 Five-feature UMAP assets cannot replace seven-feature ChromoLift training
 inputs or the ChromoID gallery. Redrawing saved coordinates and retraining

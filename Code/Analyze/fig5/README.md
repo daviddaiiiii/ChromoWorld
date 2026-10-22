@@ -34,11 +34,18 @@ convexity, topology, skeleton/radii, border contact, and intensity.
 Historical MIP features require a separate 2D projection-extraction stage;
 the 3D exporter does not substitute for that stage.
 
-Dataset/3D currently contains the matched DAPI/Tag archive. Its name records
-the 1,333-pair selection; unpack and inspect its internal paths before choosing
---input. No separate 3D GT-mask export is present in the release folder.
+Download the matched 1,333-pair DAPI/Tag archive using the
+[3D download and extracted-layout guide](../../../Dataset/README.md#3d-matched-dapitag-volumes).
+Choose the extracted DAPI directory for --input; Tag is an intensity channel,
+not a GT instance mask. No separate 3D GT-mask export is claimed.
 
 ## 4D ChromoPose pipeline
+
+The [4D live-cell data package](../../../Dataset/README.md#4d-live-cell-movies-predicted-masks-and-tracks)
+documents 55 movies with image stages, predicted masks, tracks and previews.
+Its Drive upload is pending; consult the dataset guide's availability notice.
+Use a DAPI-only input directory; exclude Tag files and GIF/MP4 previews.
+The dataset's masks/tracks are algorithm outputs, not ground-truth identities.
 
 ```bash
 python Code/Analyze/fig5/get-4dmask_TIFF2TIFF.py \
