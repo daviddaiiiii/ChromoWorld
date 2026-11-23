@@ -32,12 +32,16 @@ const chapters = [[0,'Live imaging'],[11,'G-banding'],[25,'FISH & ChromoPix'],[4
       </div>
       <div class="hero-film">
         <figure class="film">
-          <figcaption><strong>Project overview</strong><span>2:48</span></figcaption>
-          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=5')} src={asset('intro.mp4?v=6')} aria-label="ChromoWorld project overview"></video>
+          <figcaption><strong>Project overview</strong><span>2:53</span></figcaption>
+          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=7')} src={asset('intro.mp4?v=7')} aria-label="ChromoWorld project overview">
+            <track kind="captions" srclang="en" label="English" src={asset('intro-en.vtt?v=7')} />
+            <track kind="subtitles" srclang="zh-Hans" label="简体中文" src={asset('intro-zh.vtt?v=7')} />
+          </video>
         </figure>
         <div class="chapter-row" aria-label="Jump to a video chapter">
           {chapters.map(([time,label]) => <button data-time={time} type="button">{label}</button>)}
         </div>
+        <p class="film-credit">Music · <a href="https://www.scottbuckley.com.au/library/a-kind-of-hope/">“A Kind Of Hope” by Scott Buckley</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
       </div>
     </div>
   </section>
@@ -72,7 +76,19 @@ const chapters = [[0,'Live imaging'],[11,'G-banding'],[25,'FISH & ChromoPix'],[4
 </Base>
 <script>
   const film = document.querySelector<HTMLVideoElement>('#intro')!;
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-time]')) {
+  const chapters = [...document.querySelectorAll<HTMLButtonElement>('[data-time]')];
+  let active: HTMLButtonElement | undefined;
+  function updateChapter() {
+    const chapter = chapters.findLast(button => Number(button.dataset.time) <= film.currentTime);
+    if (chapter === active) return;
+    active?.removeAttribute('aria-current');
+    chapter?.setAttribute('aria-current', 'true');
+    active = chapter;
+  }
+  film.addEventListener('timeupdate', updateChapter);
+  film.addEventListener('seeked', updateChapter);
+  updateChapter();
+  for (const button of chapters) {
     button.addEventListener('click', () => {
       film.currentTime = Number(button.dataset.time);
       film.play().catch(() => {});

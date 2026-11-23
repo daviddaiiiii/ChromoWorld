@@ -992,19 +992,21 @@ def write_video(path, times, preview=False):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preview",type=Path,help="Render a short review of the revised transitions")
+    parser.add_argument("--output-dir",type=Path,default=ASSETS,help="Destination for the silent movie and poster")
     args=parser.parse_args()
     if args.preview:
         ranges=((3.5,10.),(131.5,145.5),(151.,156.5),(161.,168.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
         write_video(args.preview,times,preview=True)
         return
-    with tempfile.TemporaryDirectory(dir=ASSETS) as staging:
+    args.output_dir.mkdir(parents=True,exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=args.output_dir) as staging:
         poster=Path(staging)/"intro-poster.webp"
         render(119.4).save(poster,"WEBP",quality=94)
         video=Path(staging)/"intro.mp4"
         write_video(video,(i/FPS for i in range(DURATION*FPS)))
-        video.replace(ASSETS/video.name)
-        poster.replace(ASSETS/poster.name)
+        video.replace(args.output_dir/video.name)
+        poster.replace(args.output_dir/poster.name)
 
 
 if __name__ == "__main__":

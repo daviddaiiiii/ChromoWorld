@@ -56,6 +56,24 @@ selected treatment independently.
 For a short rendering of the main transitions, run
 `python scripts/make_intro.py --preview /tmp/chromoworld-transitions.mp4`.
 
+### Voice, captions and music
+
+The published MP4 contains English narration and a music bed mastered for
+the web. The player offers English and Simplified Chinese WebVTT tracks.
+The timestamped source script is `scripts/intro_narration.json`.
+
+To rebuild, render the silent movie with
+`python scripts/make_intro.py --output-dir /tmp/chromoworld-silent`.
+Render `scripts/intro_credits.tsx` as the `ChromoWorldCredits` composition
+in Remotion. With Kokoro ONNX, SciPy and imageio-ffmpeg available, run
+`python scripts/mix_intro.py SILENT_MP4 CREDITS_MP4 SCORE_MP3 KOKORO_ONNX VOICES_BIN OUTPUT_DIR`.
+This writes the final MP4 and both subtitle tracks.
+
+Music is an excerpt of [“A Kind Of Hope” by Scott Buckley](https://www.scottbuckley.com.au/library/a-kind-of-hope/),
+licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The excerpt is faded and mixed under narration. Speech was synthesized
+locally with [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M).
+
 ## GitHub Pages
 
 Publish this folder as the source root of the desired GitHub Pages repository.
