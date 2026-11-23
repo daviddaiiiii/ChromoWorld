@@ -16,7 +16,7 @@ const explorers = [
     description:'Compare the arrangement of chromosome classes in the G-banding and FISH morphology maps.',
     links:[['Explore the maps','/identity-flow/']] },
 ];
-const chapters = [[0,'Live imaging'],[11,'G-banding'],[25,'FISH & ChromoPix'],[41,'Morphology & UMAP'],[78,'ChromoPhy'],[109,'Patient Chr14']];
+const chapters = [[0,'Live imaging'],[11,'G-banding'],[25,'FISH & ChromoPix'],[41,'Morphology & UMAP'],[78,'ChromoPhy'],[109,'Patient Chr14'],[139,'Clinical follow-up']];
 ---
 <Base>
   <section class="hero">
@@ -32,8 +32,8 @@ const chapters = [[0,'Live imaging'],[11,'G-banding'],[25,'FISH & ChromoPix'],[4
       </div>
       <div class="hero-film">
         <figure class="film">
-          <figcaption><strong>Project overview</strong><span>2:18</span></figcaption>
-          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=5')} src={asset('intro.mp4?v=5')} aria-label="ChromoWorld project overview"></video>
+          <figcaption><strong>Project overview</strong><span>2:48</span></figcaption>
+          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=5')} src={asset('intro.mp4?v=6')} aria-label="ChromoWorld project overview"></video>
         </figure>
         <div class="chapter-row" aria-label="Jump to a video chapter">
           {chapters.map(([time,label]) => <button data-time={time} type="button">{label}</button>)}

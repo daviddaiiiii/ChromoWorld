@@ -14,7 +14,7 @@ SITE = Path(__file__).resolve().parents[1]
 ASSETS = SITE / "public/assets"
 SOURCE = SITE / "src/data/overview"
 FIG4 = SITE.parent / "release/Artifacts/fig4"
-W, H, FPS, DURATION = 1280, 720, 24, 138
+W, H, FPS, DURATION = 1280, 720, 24, 168
 BLACK, WHITE, MUTED = "#000000", "#f8faff", "#c1c6d4"
 GRID, AXIS, HIRULE = "#151a20", "#626b77", "#262a32"
 FONT = Path("/System/Library/Fonts/Supplemental")
@@ -319,9 +319,10 @@ def opening(t):
     width = round(mix(480,488,move))
     paste(im,live("mitosis",frame,"dna",width),(x,381))
     for i,(head,detail) in enumerate((
-        ("Biology","Tags cover only a subset of chromosomes."),
-        ("Imaging","Chromosomes overlap in three dimensions."),
-        ("Computation","Shape and position change during division."),
+        ("Biology",("No general method labels chromosome",
+                    "identities stably through live mitosis.")),
+        ("Imaging",("Chromosomes overlap in three dimensions.",)),
+        ("Computation",("Shape and position change during division.",)),
     )):
         q = ramp(t,3.2+i*1.02,4.2+i*1.02)
         if q:
@@ -329,7 +330,8 @@ def opening(t):
             left = mix(712,680,q)
             line(im,(left,y-12),(1161,y-12),tone(HIRULE,q))
             text(im,(left,y),head,32,tone(WHITE,q),True)
-            text(im,(left,y+45),detail,23,tone(MUTED,q))
+            for j, row in enumerate(detail):
+                text(im,(left,y+43+j*26),row,23,tone(MUTED,q))
     caption(im,"A live DNA projection follows one cell into two daughters.")
     return im
 
@@ -845,6 +847,85 @@ def assay_evidence(t):
     caption(im,"Higher-copy clones showed stronger AKT signaling and greater sensitivity to capivasertib ex vivo.")
     return im
 
+
+def treatment_followup(t):
+    im = shot("Clinical follow-up · Manuscript Fig. 7", "Liver metastases regressed during therapy")
+    color = PAPER_COLORS["14"]
+    text(im,(90,178),"Sum of target-lesion diameters",29,WHITE,True)
+    x0, x1, y0, y1 = 136, 678, 265, 532
+    for value in (0,-20,-40,-60):
+        y = y0-value*(y1-y0)/60
+        line(im,(x0,y),(x1,y),HIRULE)
+        text(im,(x0-15,y),f"{value}%",20,MUTED,anchor="rm")
+    line(im,(x0,y0),(x0,y1),AXIS)
+    text(im,(x0,y1+15),"Baseline",21,MUTED,anchor="ma")
+    text(im,(x0+(x1-x0)*8/18,y1+15),"Week 8",21,MUTED,anchor="ma")
+    text(im,(x1,y1+15),"Week 18",21,MUTED,anchor="ma")
+    # Manuscript v15 Results reports the target-lesion sum at baseline and
+    # weeks 8 and 18. Only measured visits are marked.
+    points = [(x0+(x1-x0)*week/18,y0-value*(y1-y0)/60)
+              for week,value in ((0,0),(8,-31.8),(18,-47.7))]
+    starts = (0,2.1,5.0)
+    for i, ((x,y),start) in enumerate(zip(points,starts)):
+        if i:
+            p = camera(t,start-.9,start+.15)
+            px, py = points[i-1]
+            line(im,(px,py),(mix(px,x,p),mix(py,y,p)),color,3)
+        show = ramp(t,start,start+.45)
+        if show > 0:
+            dot(ImageDraw.Draw(im),x,y,5.5,tone(color,show))
+            if i:
+                text(im,(x,y-14),("−31.8%","−47.7%")[i-1],25,tone(color,show),True,"ms")
+    line(im,(756,184),(756,560),HIRULE)
+    p = ramp(t,.28,1.0)
+    text(im,(800,212),"Capivasertib-based therapy",29,tone(WHITE,p),True)
+    text(im,(800,267),"Combined with endocrine therapy",23,tone(MUTED,p))
+    text(im,(800,327),"Treatment selected independently",23,tone(MUTED,p))
+    text(im,(800,357),"by the clinical team",23,tone(MUTED,p))
+    q = ramp(t,5.5,6.25)
+    text(im,(800,441),"Partial response",42,tone(color,q),True)
+    text(im,(800,503),"No new metastatic lesions observed",23,tone(MUTED,q))
+    caption(im,"CT measurements in the patient with the Chr14 trajectory, relative to pretreatment baseline.")
+    return im
+
+
+def broader_recovery(t):
+    im = shot("Clinical follow-up · Manuscript Fig. 7", "Clinical measures also improved")
+    rows = [
+        ("Tumor markers","Serum CA15-3 and CEA declined."),
+        ("Liver biochemistry","Markers including AST, ALT and bilirubin improved."),
+        ("Daily function and symptoms","Performance status improved, with less liver pain and fatigue."),
+    ]
+    for i,(heading,description) in enumerate(rows):
+        p = ramp(t,.4+i*1.6,1.+i*1.6)
+        y = 206+i*121
+        line(im,(78,y-18),(1201,y-18),tone(HIRULE,p))
+        text(im,(83,y),heading,34,tone(WHITE,p),True)
+        text(im,(84,y+51),description,27,tone(MUTED,p))
+    caption(im,"Clinical follow-up during capivasertib-based therapy in the same patient.")
+    return im
+
+
+def closing(t):
+    im = shot("ChromoWorld", "From chromosome dynamics to therapy hypotheses")
+    color = PAPER_COLORS["14"]
+    items = [
+        ("Detect","Chr14 segregation"),
+        ("Test","Response to AKT inhibition"),
+        ("Follow","Clinical response"),
+    ]
+    for i,(verb,detail) in enumerate(items):
+        x = 81+i*386
+        p = ramp(t,.15+i*.5,.85+i*.5)
+        line(im,(x,264),(x+335,264),tone(color,p),2)
+        text(im,(x,294),verb,42,tone(WHITE,p),True)
+        text(im,(x,353),detail,27,tone(MUTED,p))
+    p = ramp(t,2.05,2.85)
+    text(im,(81,495),"Live-cell imaging could help prioritize therapies for clinical validation.",30,tone(WHITE,p))
+    caption(im,"Single-patient clinical follow-up.",p)
+    return im
+
+
 # A short dip separates changes of specimen or scale. Aligned views and
 # object-to-point handoffs cut in place so no pair of headlines overlaps.
 SCENES = [
@@ -864,6 +945,9 @@ SCENES = [
     (122,micromanipulation,True),
     (128,qpcr_chapter,False),
     (132.5,assay_evidence,False),
+    (139,treatment_followup,True),
+    (151,broader_recovery,False),
+    (161,closing,True),
 ]
 
 
@@ -877,6 +961,8 @@ def render(t):
         if i+1<len(SCENES) and SCENES[i+1][2]:
             following=SCENES[i+1][0]
             visibility=min(visibility,1-ramp(t,following-.20,following))
+        if i == len(SCENES)-1:
+            visibility = min(visibility,1-ramp(t,DURATION-.75,DURATION))
         return light(scene(local),visibility)
     raise ValueError(f"Negative video time {t}")
 
@@ -908,7 +994,7 @@ def main():
     parser.add_argument("--preview",type=Path,help="Render a short review of the revised transitions")
     args=parser.parse_args()
     if args.preview:
-        ranges=((38.8,44.3),(48.7,59.),(82.8,89.8),(117.7,126.6),(131.5,138.))
+        ranges=((3.5,10.),(131.5,145.5),(151.,156.5),(161.,168.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
         write_video(args.preview,times,preview=True)
         return

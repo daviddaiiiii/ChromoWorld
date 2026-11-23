@@ -50,6 +50,9 @@ tracked instance recorded in `src/data/overview/fig5-live/source.json`.
 its frame matches to the paper presentation. The displayed daughter
 counts are imaging-based inferences. The micromanipulation sequence is
 a schematic, followed by cropped experimental evidence from Fig. 6.
+The clinical follow-up uses the target-lesion measurements and clinical
+observations reported in the v15 manuscript Results. The clinical team
+selected treatment independently.
 For a short rendering of the main transitions, run
 `python scripts/make_intro.py --preview /tmp/chromoworld-transitions.mp4`.
 
