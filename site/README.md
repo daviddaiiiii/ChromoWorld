@@ -37,7 +37,12 @@ in `scripts/prepare_assets.py`.
 
 The opening karyotype is arranged from a single held-out, reference-annotated
 G-banding field. `scripts/prepare_intro_story.py` extracts it and the Fig. 2/5
-comparison panels from the original local datasets and figure exports.
+comparison panels from the original local datasets and figure exports. Pass
+`--pose-figure` the raster export of Supplementary Fig. S2 to extract the
+same-frame comparison of FAST-CHIMP (EmbedSeg), Cellpose-SAM and ChromoPose.
+The comparison is qualitative. The subsequent diagram explains the distance-
+guided move toward the skeleton and convergence-based grouping along the
+learned 3D flow.
 The three live-cell comparison plots reuse a single saved UMAP coordinate
 set and apply each method’s archived class assignments.
 
@@ -49,7 +54,7 @@ records the FISH annotation index, probe-channel registration and matching
 global row in the archived UMAP. The comparison aligns class means from
 the separately fitted G-banding and FISH maps to the joint map. The film
 uses the saved Lifted2D embedding to visualize the 3D descriptor atlas.
-The ChromoPose, ChromoLift and ChromoID shots share the Fig. 5f movie and
+The tracking, ChromoLift and ChromoID shots share the Fig. 5f movie and
 tracked instance recorded in `src/data/overview/fig5-live/source.json`.
 
 `src/data/overview/patient-source.json` records the patient clip and

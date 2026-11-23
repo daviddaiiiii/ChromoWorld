@@ -84,6 +84,16 @@ def benchmark_panels(fig2, fig2_figure, fig5, dest):
             save(image.convert("RGB"),dest,name)
 
 
+def pose_panels(figure, dest):
+    # Image interiors in Supplementary Fig. S2c, without borders or headings.
+    with Image.open(figure) as source:
+        figure = source.convert("RGB")
+    for name, x in (("fast-chimp", 78), ("cellpose", 325), ("chromopose", 570)):
+        box = (x/1261, 591/1560, (x+232)/1261, 823/1560)
+        crop = figure.crop(tuple(round(a*b) for a,b in zip(box, figure.size*2)))
+        save(crop, dest, f"pose-{name}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset", type=Path)
@@ -91,15 +101,19 @@ def main():
     parser.add_argument("fig2_figure", type=Path)
     parser.add_argument("fig5", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--pose-figure", type=Path, required=True,
+                        help="Raster export of the full Supplementary Fig. S2 plate")
     args = parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True)
     karyotype(args.dataset,"Banding_05535",args.output)
     benchmark_panels(args.fig2,args.fig2_figure,args.fig5,args.output)
+    pose_panels(args.pose_figure,args.output)
     (args.output/"sources.json").write_text(json.dumps({
         "karyotype":"Dataset/2D held-out G-banding, Banding_05535; arranged by the reference annotations",
         "banding_only":"Archival Fig. 2C/D reference and Banding-only baselines for id01_HFF_FISH_00023",
         "projection":"Archival Fig. 5A/B image panels from the presentation",
-        "identity_flow":"LiftedMIP_umap_embed.npz; same embedding coordinates, three sets of inferred identities"
+        "identity_flow":"LiftedMIP_umap_embed.npz; same embedding coordinates, three sets of inferred identities",
+        "pose_comparison":"Supplementary Fig. S2c; three predictions on the same live-cell frame"
     },indent=2)+"\n")
 
 

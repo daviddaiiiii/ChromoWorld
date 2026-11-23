@@ -1,142 +1,164 @@
 WEBVTT
 
-00:00:00.800 --> 00:00:07.637 line:92%,end size:91%
+00:00:00.870 --> 00:00:07.707 line:92%,end size:91%
 A karyotype tells us which chromosomes a cell has, how
 many copies there are, and whether their structure has
 changed.
 
-00:00:07.850 --> 00:00:10.549 line:92%,end size:91%
-These changes can inform a diagnosis.
+00:00:08.560 --> 00:00:11.670 line:92%,end size:91%
+That can help diagnose genetic disorders and some
+cancers.
 
-00:00:11.350 --> 00:00:15.660 line:92%,end size:91%
+00:00:12.390 --> 00:00:17.180 line:92%,end size:91%
 When a living cell divides, can we see where an
 abnormal chromosome count comes from?
 
-00:00:15.900 --> 00:00:19.800 line:92%,end size:91%
+00:00:17.440 --> 00:00:21.780 line:92%,end size:91%
 We lack a general way to label chromosome identities
 through mitosis.
 
-00:00:20.500 --> 00:00:25.716 line:92%,end size:91%
+00:00:22.580 --> 00:00:27.796 line:92%,end size:91%
 ChromoWorld brings two streams together. Fixed cells
 provide the reference identities.
 
-00:00:26.150 --> 00:00:31.515 line:92%,end size:91%
+00:00:29.170 --> 00:00:34.535 line:92%,end size:91%
 ChromoPix identifies them, and ChromoLift builds a
 three-dimensional reference atlas.
 
-00:00:31.950 --> 00:00:37.700 line:92%,end size:91%
+00:00:35.940 --> 00:00:42.073 line:92%,end size:91%
 ChromoPose separates live instances. Tracking links
 them. ChromoID matches their shapes.
 
-00:00:38.500 --> 00:00:45.685 line:92%,end size:91%
+00:00:43.500 --> 00:00:50.685 line:92%,end size:91%
 G-banding gives models two reliable cues in fixed
 spreads: distinctive stripes and familiar shapes
 produced by preparation.
 
-00:00:46.350 --> 00:00:52.500 line:92%,end size:91%
+00:00:51.380 --> 00:00:58.000 line:92%,end size:91%
 The cues change with preparation. Banding-trained
 models lose accuracy on rehydrated chromosomes.
 
-00:00:52.750 --> 00:00:58.073 line:92%,end size:91%
+00:00:58.270 --> 00:01:03.593 line:92%,end size:91%
 Changing the architecture barely helps. Training
 rewarded cues tied to preparation.
 
-00:00:59.500 --> 00:01:05.600 line:92%,end size:91%
+00:01:05.500 --> 00:01:11.600 line:92%,end size:91%
 FISH brings us closer. Rehydrated chromosomes lack
 bands, but DNA probes can identify them.
 
-00:01:05.880 --> 00:01:09.155 line:92%,end size:91%
+00:01:11.880 --> 00:01:15.155 line:92%,end size:91%
 Probe labels are precise, but sparse within a field.
 
-00:01:11.370 --> 00:01:18.892 line:92%,end size:91%
+00:01:17.390 --> 00:01:25.366 line:92%,end size:91%
 ChromoPix learns from the labels and from paired views
 of the same chromosome. One view keeps the shape while
 suppressing fine texture.
 
-00:01:19.150 --> 00:01:26.684 line:92%,end size:91%
+00:01:25.660 --> 00:01:33.648 line:92%,end size:91%
 Aligning their features rewards what survives that
 change. A chromosome-class prompt lets the decoder
 focus on one identity at a time.
 
-00:01:27.450 --> 00:01:33.093 line:92%,end size:91%
-Follow one tagged chromosome. We measure its shape,
-then turn those measurements into a point.
+00:01:34.450 --> 00:01:39.026 line:92%,end size:91%
+We measure one tagged chromosome, then use UMAP to
+place its shape at a point.
 
-00:01:34.270 --> 00:01:42.281 line:92%,end size:91%
+00:01:45.320 --> 00:01:53.331 line:92%,end size:91%
 Pull back to more than seven hundred thousand
 chromosome instances. Each point has a shape, and its
 color marks a chromosome class.
 
-00:01:44.400 --> 00:01:50.760 line:92%,end size:91%
-The class arrangements are similar across both
-preparations. Could those shape relationships help in
-living cells?
+00:01:54.510 --> 00:02:01.795 line:92%,end size:91%
+Across both preparations, the classes follow a similar
+order. Can those relationships carry over to living
+cells?
 
-00:01:51.400 --> 00:01:56.800 line:92%,end size:91%
+00:02:03.470 --> 00:02:09.305 line:92%,end size:91%
 Whole-cell projections can collapse identities. Better
 views recover only part of the order.
 
-00:01:57.380 --> 00:02:05.866 line:92%,end size:91%
-ChromoPose segments chromosomes in three dimensions.
-Tracking links the instances. ChromoPhy uses their
-measured geometry to infer identity.
+00:02:10.120 --> 00:02:12.820 line:92%,end size:91%
+First, separate the chromosomes in three dimensions.
 
-00:02:07.250 --> 00:02:16.598 line:92%,end size:91%
+00:02:13.420 --> 00:02:19.620 line:92%,end size:91%
+Here FAST-CHIMP produces many small fragments.
+Cellpose-SAM shows broader, joined-looking regions.
+
+00:02:20.100 --> 00:02:23.780 line:92%,end size:91%
+ChromoPose better preserves long, separate shapes in
+this frame.
+
+00:02:25.470 --> 00:02:32.600 line:92%,end size:91%
+To follow a bend, ChromoPose first uses predicted
+distance and flow to move voxels toward the local
+centerline.
+
+00:02:32.940 --> 00:02:38.903 line:92%,end size:91%
+Then it follows the learned flow along the bend. Voxels
+that converge together form one instance.
+
+00:02:41.550 --> 00:02:49.731 line:92%,end size:91%
+Tracking links those three-dimensional instances across
+frames. Their measured shapes become the input for
+chromosome identification.
+
+00:02:51.280 --> 00:03:00.955 line:92%,end size:91%
 A live chromosome provides its own training pair: its
 projection and its measured three-dimensional shape,
 including volume, elongation, and sphericity.
 
-00:02:17.340 --> 00:02:26.375 line:92%,end size:91%
+00:03:02.370 --> 00:03:11.405 line:92%,end size:91%
 ChromoLift learns that mapping with flow matching. It
 moves compact shape descriptors, so thousands of
 labeled references can be lifted in batches.
 
-00:02:27.520 --> 00:02:35.625 line:92%,end size:91%
+00:03:13.580 --> 00:03:22.465 line:92%,end size:91%
 The same shapes, three results. Direct projection mixes
 identities. Optimal projection helps. ChromoPhy
 restores a clearer order.
 
-00:02:36.270 --> 00:02:41.635 line:92%,end size:91%
-ChromoID matches measured live shapes to the atlas,
-ranking candidate identities.
+00:03:23.310 --> 00:03:29.670 line:92%,end size:91%
+ChromoID ranks identities by matching physical
+measurements, including volume and shape, to that
+atlas.
 
-00:02:42.430 --> 00:02:46.835 line:92%,end size:91%
-We checked predictions with fluorescent tags on
-chromosomes three and eighteen.
+00:03:30.500 --> 00:03:35.268 line:92%,end size:91%
+We can compare the reviewed chromosome three candidates
+with the measured fluorescence.
 
-00:02:48.230 --> 00:02:53.425 line:92%,end size:91%
-We used only DNA to predict. Then we revealed
-fluorescence to check positions.
+00:03:37.270 --> 00:03:42.443 line:92%,end size:91%
+For chromosome eighteen, the tag also lets us check
+where the candidates sit over time.
 
-00:02:54.450 --> 00:03:03.037 line:92%,end size:91%
+00:03:44.530 --> 00:03:53.117 line:92%,end size:91%
 In patient-derived tumor cells, imaging suggested that
 one daughter received two copies of chromosome fourteen
 and the other received four.
 
-00:03:05.350 --> 00:03:08.881 line:92%,end size:91%
+00:03:57.420 --> 00:04:00.951 line:92%,end size:91%
 We isolated daughter cells and grew them into separate
 clones.
 
-00:03:10.220 --> 00:03:13.324 line:92%,end size:91%
+00:04:03.260 --> 00:04:06.364 line:92%,end size:91%
 Copy-number differences persisted across passages.
 
-00:03:15.250 --> 00:03:21.690 line:92%,end size:91%
+00:04:09.290 --> 00:04:16.447 line:92%,end size:91%
 Higher-copy clones showed stronger AKT signaling and
 greater sensitivity to capivasertib in the lab.
 
-00:03:22.450 --> 00:03:26.950 line:92%,end size:91%
+00:04:17.530 --> 00:04:22.575 line:92%,end size:91%
 The clinical team independently chose capivasertib with
 endocrine therapy.
 
-00:03:27.120 --> 00:03:32.677 line:92%,end size:91%
+00:04:23.050 --> 00:04:28.607 line:92%,end size:91%
 Liver target lesions shrank by nearly a third at eight
 weeks, and by nearly half at eighteen.
 
-00:03:33.450 --> 00:03:40.458 line:92%,end size:91%
+00:04:30.560 --> 00:04:37.568 line:92%,end size:91%
 Tumor markers and liver biochemistry improved. Daily
 function improved too, with less liver pain and
 fatigue.
 
-00:03:41.570 --> 00:03:47.360 line:92%,end size:91%
+00:04:40.650 --> 00:04:47.125 line:92%,end size:91%
 Reading chromosome identities in living cells lets us
 ask what an unequal division sets in motion.

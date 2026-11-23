@@ -14,7 +14,7 @@ SITE = Path(__file__).resolve().parents[1]
 ASSETS = SITE / "public/assets"
 SOURCE = SITE / "src/data/overview"
 FIG4 = SITE.parent / "release/Artifacts/fig4"
-W, H, FPS, DURATION = 1280, 720, 24, 228
+W, H, FPS, DURATION = 1280, 720, 24, 288
 BLACK, WHITE, MUTED = "#000000", "#f8faff", "#c1c6d4"
 GRID, AXIS, HIRULE = "#151a20", "#626b77", "#262a32"
 FONT = Path("/System/Library/Fonts/Supplemental")
@@ -591,10 +591,100 @@ def fig5_layer(time,layer,width):
     return picture(SOURCE/f"fig5-live/{time}-{layer}.webp",width)
 
 
+def pose_comparison(t):
+    im = shot("ChromoPose / Supplementary Fig. S2c", "The same frame, three segmentations")
+    methods = (
+        ("fast-chimp", "FAST-CHIMP (EmbedSeg)", "Embeddings + watershed refinement", "Many small fragments"),
+        ("cellpose", "Cellpose-SAM", "Diffusion-based flows", "Broad, joined-looking regions"),
+        ("chromopose", "ChromoPose", "Chromosome-guided flows", "Slender, more continuous instances"),
+    )
+    detail = camera(t, 4.8, 6.8)
+    reveal = ramp(t, 5.9, 7.1)
+    for x, (name, method, approach, observation) in zip((252, 640, 1028), methods):
+        label(im, x, 165, method, color="#d5c2ff" if name == "chromopose" else WHITE, size=26)
+        text(im, (x, 200), approach, 20, MUTED, anchor="ma")
+        img = picture(SOURCE/f"story/pose-{name}.webp")
+        inset = detail*.065
+        box = (inset*img.width, inset*img.height, (1-inset)*img.width, (1-inset)*img.height)
+        paste(im, img.resize((346, 346), Image.Resampling.LANCZOS, box=box), (x, 403))
+        text(im, (x, 583), observation, 21, tone(WHITE, reveal), True, "ma")
+    for x in (446, 834):
+        line(im, (x,171), (x,606), HIRULE)
+    caption(im, "Qualitative comparison on one live-cell frame. Colors distinguish instances within each panel.")
+    return im
+
+
+def schematic_centerline(p, index):
+    bend = np.sin(np.pi*(p+.12))
+    x = 135 + 527*p
+    y = 295 + 143*index - (82-20*index)*bend + (75-24*index)*p*p
+    return np.array((x, y))
+
+
+POSE_TUBES = (("#344e64", "#14202e", "#78c8f9"), ("#584166", "#251932", "#cc9eed"))
+
+
+@lru_cache(maxsize=1)
+def pose_schematic_plate():
+    plate = Image.new("RGB", (W*2,H*2), BLACK)
+    draw = ImageDraw.Draw(plate)
+    for index, (rim, fill, _) in enumerate(POSE_TUBES):
+        points = [tuple(2*schematic_centerline(p,index)) for p in np.linspace(0,1,233)]
+        for radius, color in ((100,rim),(95,fill)):
+            for point in points:
+                dot(draw, *point, radius, color)
+        for j in range(0, len(points)-7, 12):
+            draw.line((points[j],points[j+7]), fill=rim, width=3)
+    return plate.resize((W,H),Image.Resampling.LANCZOS)
+
+
+def pose_design(t):
+    im = shot("ChromoPose / decoding schematic", "Follow the bends of each chromosome")
+    im.paste(pose_schematic_plate().crop((0,151,748,570)),(0,151))
+    draw = ImageDraw.Draw(im)
+    local_move = camera(t, 2.0, 6.7)
+    follow_flow = camera(t, 8.15, 13.25)
+    for index, (_, _, accent) in enumerate(POSE_TUBES):
+        attractor = .57 if index == 0 else .47
+        for p, offset in ((.08, -24), (.19, 24), (.31, -28), (.44, 28),
+                          (.62, -26), (.74, 29), (.85, -24), (.94, 24)):
+            center = schematic_centerline(p,index)
+            tangent = schematic_centerline(p+.01,index)-schematic_centerline(p-.01,index)
+            normal = np.array((-tangent[1], tangent[0])) / np.linalg.norm(tangent)
+            starting_point = center + offset*normal
+            if local_move < .98:
+                line(im, tuple(starting_point), tuple(center), tone(accent, .50*(1-local_move)), 2)
+            moved = mix(p,attractor,follow_flow)
+            if follow_flow:
+                trail = mix(p,attractor,max(0,follow_flow-.16))
+                path = [tuple(schematic_centerline(v,index)) for v in np.linspace(trail,moved,9)]
+                draw.line(path,fill=tone(accent,.55),width=2)
+            position = schematic_centerline(moved,index) + offset*(1-local_move)*normal
+            dot(draw, *position, 5, accent)
+        if follow_flow > 0:
+            target = schematic_centerline(attractor,index)
+            dot(draw, *target, 14, None, tone(accent, follow_flow), 2)
+
+    line(im, (756,185), (756,584), HIRULE)
+    rows = (
+        (202, 0., "Learned cues", "Flow direction + skeleton distance"),
+        (323, 1.4, "1. Distance-guided move", "Toward the local centerline"),
+        (443, 7.55, "2. Integrate and group", "Along the learned flow"),
+    )
+    for y, start, title, detail in rows:
+        p = ramp(t, start, start+.63)
+        if p:
+            text(im, (797,y), title, 28, tone(WHITE,p), True)
+            text(im, (797,y+38), detail, 23, tone(MUTED,p))
+    text(im, (98,582), "Centerlines and voxel paths shown schematically", 20, MUTED)
+    caption(im, "A 3D backbone also predicts foreground, boundaries and the skeleton itself.")
+    return im
+
+
 def segmentation(t):
     im=shot("ChromoPose / tracking","Follow the same chromosome")
     frames=fig5_frames()
-    index=min(len(frames)-1,int(clamp((t-.75)/6.1)*len(frames)))
+    index=min(len(frames)-1,int(clamp((t-.75)/7.4)*len(frames)))
     t_image=frames[index]
     split=camera(t,.75,2.4)
     focus=ramp(t,2.7,3.72)
@@ -609,7 +699,7 @@ def segmentation(t):
     label(im,x,590,"Live DNA projection")
     label(im,952,590,"Tracked instance" if focus>.55 else "3D instances",split,
           "#c0ddfa" if focus>.55 else WHITE)
-    caption(im,"ChromoPose separates instances in 3D. Tracking links them through time.")
+    caption(im,"Tracking links the 3D instances in time. Their geometry feeds identity retrieval.")
     return im
 
 
@@ -689,7 +779,7 @@ def atlas_and_match(t):
 
 
 def live_identity(t, case="chr18"):
-    im=shot("ChromoPhy / independent tag","Check the inferred identity")
+    im=shot("ChromoPhy / fluorescence comparison","Compare candidates with fluorescence")
     p=ramp(t,1.05,2.58)
     frame=min(7,(2 if case=="chr3" else 1)+int(t*.76))
     paste(im,live(case,frame,"candidates",451),(329,379))
@@ -699,7 +789,7 @@ def live_identity(t, case="chr18"):
     line(im,(640,174),(640,547),HIRULE)
     label(im,329,588,f"Chr{case[3:]} candidates")
     label(im,951,588,"DNA + fluorescent tag" if p>.40 else "Live DNA")
-    caption(im,"An independent fluorescence channel supports the imaging-based identity check.")
+    caption(im,"Manually reviewed candidates are shown beside the measured Tag signal.")
     return im
 
 
@@ -1090,33 +1180,35 @@ def batch_lift(t):
 # object-to-point handoffs cut in place so no pair of headlines overlaps.
 SCENES = [
     (0,karyotype_open,False),
-    (11,living_question,False),
-    (20,architecture,True),
-    (38,banding,True),
-    (46,cross_domain,False),
-    (59,lambda t: virtual_fish(t*.92),True),
-    (71,invariant_learning,False),
-    (87,lambda t: morphology(t*1.22),True),
-    (94,lambda t: to_one_point(t*1.25),False),
-    (98,lambda t: population(t*1.52),False),
-    (104,lambda t: native_comparison(t+4.2),False),
-    (106,centroid_comparison,False),
-    (111,projection_failure,True),
-    (117,lambda t: architecture(t,True),False),
-    (119,segmentation,False),
-    (127,lambda t: lift_training(t*.94),False),
-    (137,batch_lift,False),
-    (147,retrieval_comparison,True),
-    (156,lambda t: atlas_and_match(t+5.9),False),
-    (162,lambda t: live_identity(t,"chr3"),True),
-    (168,live_identity,False),
-    (174,patient_division,True),
-    (185,micromanipulation,True),
-    (190,qpcr_chapter,False),
-    (195,assay_evidence,False),
-    (202,treatment_followup,True),
-    (213,broader_recovery,False),
-    (221,closing,True),
+    (12,living_question,False),
+    (22,architecture,True),
+    (43,banding,True),
+    (51,cross_domain,False),
+    (65,lambda t: virtual_fish(t*.92),True),
+    (77,lambda t: invariant_learning(t*.95),False),
+    (94,lambda t: morphology(t*1.22),True),
+    (101,to_one_point,False),
+    (106,lambda t: population(t*1.15),False),
+    (114,lambda t: native_comparison(t+4.2),False),
+    (117,centroid_comparison,False),
+    (123,projection_failure,True),
+    (130,lambda t: architecture(t,True),False),
+    (133,pose_comparison,True),
+    (145,pose_design,True),
+    (161,segmentation,False),
+    (171,lambda t: lift_training(t*.91),False),
+    (182,batch_lift,False),
+    (193,retrieval_comparison,True),
+    (203,lambda t: atlas_and_match(t+5.9),False),
+    (210,lambda t: live_identity(t,"chr3"),True),
+    (217,live_identity,False),
+    (224,patient_division,True),
+    (237,micromanipulation,True),
+    (243,qpcr_chapter,False),
+    (249,assay_evidence,False),
+    (257,lambda t: treatment_followup(t*.89),True),
+    (270,broader_recovery,False),
+    (280,closing,True),
 ]
 
 
@@ -1164,14 +1256,14 @@ def main():
     parser.add_argument("--output-dir",type=Path,default=ASSETS,help="Destination for the silent movie and poster")
     args=parser.parse_args()
     if args.preview:
-        ranges=((15.,29.),(56.,77.),(92.,105.),(142.,154.),(198.,207.),(222.,228.))
+        ranges=((21.,43.),(93.,124.),(130.,171.),(192.,211.),(247.,270.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
         write_video(args.preview,times,preview=True)
         return
     args.output_dir.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(dir=args.output_dir) as staging:
         poster=Path(staging)/"intro-poster.webp"
-        render(34.).save(poster,"WEBP",quality=94)
+        render(38.).save(poster,"WEBP",quality=94)
         video=Path(staging)/"intro.mp4"
         write_video(video,(i/FPS for i in range(DURATION*FPS)))
         video.replace(args.output_dir/video.name)

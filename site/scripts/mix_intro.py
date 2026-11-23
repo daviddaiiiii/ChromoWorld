@@ -16,7 +16,7 @@ from scipy.signal import resample_poly
 
 FPS = 24
 RATE = 48_000
-DURATION = 233
+DURATION = 293
 VOICE = "af_heart"
 CUES = Path(__file__).with_name("intro_narration.json")
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
@@ -67,11 +67,15 @@ def cue_time(t):
 def narration(model, work):
     dialogue = np.zeros(DURATION*RATE, dtype=np.float32)
     captions = {"en": [], "zh": []}
+    previous_stop = 0
     for i,(start, stop, en, zh, *spoken) in enumerate(json.loads(CUES.read_text()), 1):
+        if not previous_stop <= start < stop <= DURATION:
+            raise ValueError(f"Invalid narration window for cue {i}: {start}–{stop}")
         audio = speak(model, spoken[0] if spoken else en, stop-start)
         start_index = round(start*RATE)
         dialogue[start_index:start_index+len(audio)] = audio
         finish = min(stop,start+len(audio)/RATE+.16)
+        previous_stop = stop
         for lang, text in (("en", en), ("zh", zh)):
             captions[lang].append({"text":text, "startMs":round(start*1000), "endMs":round(finish*1000),
                                    "timestampMs":None, "confidence":None})
@@ -98,7 +102,7 @@ def music_bed(score, dialogue):
     occupied = ndimage.maximum_filter1d(active,size=35)
     duck = ndimage.gaussian_filter1d(occupied,sigma=7)
     fade = np.clip((DURATION-time)/3.4,0,1)*np.clip(time/.7,0,1)
-    lift = np.interp(time,[0.,1.1,60.,61.,202.,203.,222.,228.,229.,233.],[1.25,1.,1.,.93,1.,.84,.84,1.2,1.5,1.5])
+    lift = np.interp(time,[0.,1.1,65.,66.,257.,258.,280.,288.,289.,293.],[1.25,1.,1.,.93,1.,.84,.84,1.2,1.5,1.5])
     envelope = fade*lift*(1-.49*duck)
     # Keep the score in the background even at the orchestral swell.
     block_rms = np.sqrt(np.mean(music.reshape(-1,hop,2)**2,axis=(1,2)))
@@ -137,7 +141,7 @@ def encode_overview(video, credits, sound, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("video", type=Path, help="228-second silent overview")
+    parser.add_argument("video", type=Path, help="Silent overview before the credits")
     parser.add_argument("credits", type=Path, help="Five-second Remotion credits clip")
     parser.add_argument("music", type=Path)
     parser.add_argument("model", type=Path)
