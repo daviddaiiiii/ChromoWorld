@@ -1,102 +1,142 @@
 WEBVTT
 
-00:00:00.800 --> 00:00:03.776 line:92%,end size:91%
-As a cell divides, where does each chromosome go?
+00:00:00.800 --> 00:00:07.637 line:92%,end size:91%
+A karyotype tells us which chromosomes a cell has, how
+many copies there are, and whether their structure has
+changed.
 
-00:00:05.000 --> 00:00:10.750 line:92%,end size:91%
-Live cells lack a general way to label chromosome
-identities stably through mitosis.
+00:00:07.850 --> 00:00:10.549 line:92%,end size:91%
+These changes can inform a diagnosis.
 
-00:00:11.400 --> 00:00:16.957 line:92%,end size:91%
-In fixed cells, G-banding reveals a recognizable
-pattern of light and dark bands.
+00:00:11.350 --> 00:00:15.660 line:92%,end size:91%
+When a living cell divides, can we see where an
+abnormal chromosome count comes from?
 
-00:00:17.850 --> 00:00:24.346 line:92%,end size:91%
-Rehydrated chromosomes retain more of their shape.
-Without the bands, their identities are harder to read.
+00:00:15.900 --> 00:00:19.800 line:92%,end size:91%
+We lack a general way to label chromosome identities
+through mitosis.
 
-00:00:25.350 --> 00:00:32.100 line:92%,end size:91%
-Fluorescence in situ hybridization, or FISH, uses a
-known DNA sequence to establish a reference identity.
+00:00:20.500 --> 00:00:25.716 line:92%,end size:91%
+ChromoWorld brings two streams together. Fixed cells
+provide the reference identities.
 
-00:00:32.400 --> 00:00:39.344 line:92%,end size:91%
-ChromoPix learns from both banded and bandless images
-to segment chromosomes and predict their identities.
+00:00:26.150 --> 00:00:31.515 line:92%,end size:91%
+ChromoPix identifies them, and ChromoLift builds a
+three-dimensional reference atlas.
 
-00:00:41.350 --> 00:00:48.934 line:92%,end size:91%
-Follow this one chromosome. We measure its relative
-area, elongation, solidity, circularity, and
-tortuosity.
+00:00:31.950 --> 00:00:37.700 line:92%,end size:91%
+ChromoPose separates live instances. Tracking links
+them. ChromoID matches their shapes.
 
-00:00:50.250 --> 00:00:55.487 line:92%,end size:91%
-UMAP puts those measurements on a two-dimensional map.
-One point is one chromosome.
+00:00:38.500 --> 00:00:45.685 line:92%,end size:91%
+G-banding gives models two reliable cues in fixed
+spreads: distinctive stripes and familiar shapes
+produced by preparation.
 
-00:00:56.350 --> 00:01:04.873 line:92%,end size:91%
-Now pull back. Across more than seven hundred thousand
-instances, chromosomes organize by shape. Color marks
-chromosome class.
+00:00:46.350 --> 00:00:52.500 line:92%,end size:91%
+The cues change with preparation. Banding-trained
+models lose accuracy on rehydrated chromosomes.
 
-00:01:06.250 --> 00:01:10.869 line:92%,end size:91%
-The G-banding and FISH maps show a similar order across
-chromosome classes.
+00:00:52.750 --> 00:00:58.073 line:92%,end size:91%
+Changing the architecture barely helps. Training
+rewarded cues tied to preparation.
 
-00:01:12.200 --> 00:01:16.947 line:92%,end size:91%
-That agreement gives us a reference for interpreting
-chromosomes in living cells.
+00:00:59.500 --> 00:01:05.600 line:92%,end size:91%
+FISH brings us closer. Rehydrated chromosomes lack
+bands, but DNA probes can identify them.
 
-00:01:18.450 --> 00:01:25.309 line:92%,end size:91%
-ChromoPose separates chromosomes in three dimensions.
-Tracking links their instances as the cell divides.
+00:01:05.880 --> 00:01:09.155 line:92%,end size:91%
+Probe labels are precise, but sparse within a field.
 
-00:01:26.250 --> 00:01:32.767 line:92%,end size:91%
-ChromoLift learns how a flat projection relates to the
-measured shape of the same three-dimensional
-chromosome.
+00:01:11.370 --> 00:01:18.892 line:92%,end size:91%
+ChromoPix learns from the labels and from paired views
+of the same chromosome. One view keeps the shape while
+suppressing fine texture.
 
-00:01:34.450 --> 00:01:40.839 line:92%,end size:91%
-ChromoID compares a live chromosome with a reference
-library, using several shape features together.
+00:01:19.150 --> 00:01:26.684 line:92%,end size:91%
+Aligning their features rewards what survives that
+change. A chromosome-class prompt lets the decoder
+focus on one identity at a time.
 
-00:01:43.420 --> 00:01:48.700 line:92%,end size:91%
-A withheld fluorescent tag provides an independent
-check on the predicted identity.
+00:01:27.450 --> 00:01:33.093 line:92%,end size:91%
+Follow one tagged chromosome. We measure its shape,
+then turn those measurements into a point.
 
-00:01:49.500 --> 00:01:55.500 line:92%,end size:91%
-In patient-derived tumor cells, ChromoWorld detected an
-unusual pattern of chromosome fourteen segregation.
+00:01:34.270 --> 00:01:42.281 line:92%,end size:91%
+Pull back to more than seven hundred thousand
+chromosome instances. Each point has a shape, and its
+color marks a chromosome class.
 
-00:01:55.800 --> 00:02:00.781 line:92%,end size:91%
-The images suggested that one daughter received two
-copies and the other received four.
+00:01:44.400 --> 00:01:50.760 line:92%,end size:91%
+The class arrangements are similar across both
+preparations. Could those shape relationships help in
+living cells?
 
-00:02:02.400 --> 00:02:07.780 line:92%,end size:91%
-We isolated individual daughter cells by
-micromanipulation and grew them into separate clones.
+00:01:51.400 --> 00:01:56.800 line:92%,end size:91%
+Whole-cell projections can collapse identities. Better
+views recover only part of the order.
 
-00:02:08.250 --> 00:02:11.461 line:92%,end size:91%
-The copy-number differences persisted across passages.
+00:01:57.380 --> 00:02:05.866 line:92%,end size:91%
+ChromoPose segments chromosomes in three dimensions.
+Tracking links the instances. ChromoPhy uses their
+measured geometry to infer identity.
 
-00:02:12.830 --> 00:02:18.690 line:92%,end size:91%
+00:02:07.250 --> 00:02:16.598 line:92%,end size:91%
+A live chromosome provides its own training pair: its
+projection and its measured three-dimensional shape,
+including volume, elongation, and sphericity.
+
+00:02:17.340 --> 00:02:26.375 line:92%,end size:91%
+ChromoLift learns that mapping with flow matching. It
+moves compact shape descriptors, so thousands of
+labeled references can be lifted in batches.
+
+00:02:27.520 --> 00:02:35.625 line:92%,end size:91%
+The same shapes, three results. Direct projection mixes
+identities. Optimal projection helps. ChromoPhy
+restores a clearer order.
+
+00:02:36.270 --> 00:02:41.635 line:92%,end size:91%
+ChromoID matches measured live shapes to the atlas,
+ranking candidate identities.
+
+00:02:42.430 --> 00:02:46.835 line:92%,end size:91%
+We checked predictions with fluorescent tags on
+chromosomes three and eighteen.
+
+00:02:48.230 --> 00:02:53.425 line:92%,end size:91%
+We used only DNA to predict. Then we revealed
+fluorescence to check positions.
+
+00:02:54.450 --> 00:03:03.037 line:92%,end size:91%
+In patient-derived tumor cells, imaging suggested that
+one daughter received two copies of chromosome fourteen
+and the other received four.
+
+00:03:05.350 --> 00:03:08.881 line:92%,end size:91%
+We isolated daughter cells and grew them into separate
+clones.
+
+00:03:10.220 --> 00:03:13.324 line:92%,end size:91%
+Copy-number differences persisted across passages.
+
+00:03:15.250 --> 00:03:21.690 line:92%,end size:91%
 Higher-copy clones showed stronger AKT signaling and
-greater sensitivity to capivasertib ex vivo.
+greater sensitivity to capivasertib in the lab.
 
-00:02:19.420 --> 00:02:24.220 line:92%,end size:91%
+00:03:22.450 --> 00:03:26.950 line:92%,end size:91%
 The clinical team independently chose capivasertib with
 endocrine therapy.
 
-00:02:24.400 --> 00:02:30.021 line:92%,end size:91%
-At eight weeks, liver target lesions had shrunk nearly
-a third. By eighteen weeks, nearly half.
+00:03:27.120 --> 00:03:32.677 line:92%,end size:91%
+Liver target lesions shrank by nearly a third at eight
+weeks, and by nearly half at eighteen.
 
-00:02:31.280 --> 00:02:35.216 line:92%,end size:91%
-Serum tumor markers fell, and measures of liver
-function improved.
-
-00:02:36.150 --> 00:02:39.681 line:92%,end size:91%
-Daily function improved, with less liver pain and
+00:03:33.450 --> 00:03:40.458 line:92%,end size:91%
+Tumor markers and liver biochemistry improved. Daily
+function improved too, with less liver pain and
 fatigue.
 
-00:02:41.480 --> 00:02:45.928 line:92%,end size:91%
-Watching a cell divide can point to a treatment
-hypothesis worth testing.
+00:03:41.570 --> 00:03:47.360 line:92%,end size:91%
+Reading chromosome identities in living cells lets us
+ask what an unequal division sets in motion.

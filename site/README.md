@@ -35,6 +35,12 @@ in `scripts/prepare_assets.py`.
 
 ## Homepage film
 
+The opening karyotype is arranged from a single held-out, reference-annotated
+G-banding field. `scripts/prepare_intro_story.py` extracts it and the Fig. 2/5
+comparison panels from the original local datasets and figure exports.
+The three live-cell comparison plots reuse a single saved UMAP coordinate
+set and apply each method’s archived class assignments.
+
 Run `python scripts/make_intro.py` with Pillow, NumPy and imageio-ffmpeg
 installed. This writes the video and poster using the microscopy exports
 and the saved Fig. 4 and Fig. 5 embeddings in the sibling

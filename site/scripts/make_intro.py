@@ -14,7 +14,7 @@ SITE = Path(__file__).resolve().parents[1]
 ASSETS = SITE / "public/assets"
 SOURCE = SITE / "src/data/overview"
 FIG4 = SITE.parent / "release/Artifacts/fig4"
-W, H, FPS, DURATION = 1280, 720, 24, 168
+W, H, FPS, DURATION = 1280, 720, 24, 228
 BLACK, WHITE, MUTED = "#000000", "#f8faff", "#c1c6d4"
 GRID, AXIS, HIRULE = "#151a20", "#626b77", "#262a32"
 FONT = Path("/System/Library/Fonts/Supplemental")
@@ -311,43 +311,7 @@ def embeddings():
     fish_cloud.example()
     return combined, banding, fish_cloud
 
-def opening(t):
-    im = shot("Live-cell imaging", "Which chromosome goes where?")
-    move = camera(t,2.6,5.2)
-    frame = min(18, round(mix(1,18, clamp(t/8.7))))
-    x = mix(641,365,move)
-    width = round(mix(480,488,move))
-    paste(im,live("mitosis",frame,"dna",width),(x,381))
-    for i,(head,detail) in enumerate((
-        ("Biology",("No general method labels chromosome",
-                    "identities stably through live mitosis.")),
-        ("Imaging",("Chromosomes overlap in three dimensions.",)),
-        ("Computation",("Shape and position change during division.",)),
-    )):
-        q = ramp(t,3.2+i*1.02,4.2+i*1.02)
-        if q:
-            y = 224+i*109
-            left = mix(712,680,q)
-            line(im,(left,y-12),(1161,y-12),tone(HIRULE,q))
-            text(im,(left,y),head,32,tone(WHITE,q),True)
-            for j, row in enumerate(detail):
-                text(im,(left,y+43+j*26),row,23,tone(MUTED,q))
-    caption(im,"A live DNA projection follows one cell into two daughters.")
-    return im
-
-
 def banding(t):
-    if t >= 8.1:
-        p = camera(t,8.1,9.65)
-        im = shot("Fixed cells / G-banding","When the bands disappear")
-        plate(im,SOURCE/"banded-chr1.webp",(mix(741,319,p),383),
-              (round(mix(244,315,p)),round(mix(294,320,p))))
-        if p:
-            field_view(im,1,1,(949,379),round(mix(290,459,p)),p)
-        label(im,319,583,"G-banded Chr1",p)
-        label(im,949,583,"Rehydrated Chr1",p)
-        caption(im,"Models trained only on G-banding lose accuracy on rehydrated cells.",p)
-        return im
     im = shot("Fixed cells / G-banding","A barcode for each chromosome")
     p = camera(t,1.1,3.8)
     x = mix(640,305,p)
@@ -724,16 +688,16 @@ def atlas_and_match(t):
     return im
 
 
-def live_identity(t):
+def live_identity(t, case="chr18"):
     im=shot("ChromoPhy / independent tag","Check the inferred identity")
     p=ramp(t,1.05,2.58)
-    frame=min(7,1+int(t*1.11))
-    paste(im,live("chr18",frame,"candidates",451),(329,379))
-    dna=live("chr18",frame,"dna",451)
-    tag=live("chr18",frame,"dna-tag",451)
+    frame=min(7,(2 if case=="chr3" else 1)+int(t*.76))
+    paste(im,live(case,frame,"candidates",451),(329,379))
+    dna=live(case,frame,"dna",451)
+    tag=live(case,frame,"dna-tag",451)
     paste(im,blend(dna,tag,p),(951,379))
     line(im,(640,174),(640,547),HIRULE)
-    label(im,329,588,"Chr18 candidates")
+    label(im,329,588,f"Chr{case[3:]} candidates")
     label(im,951,588,"DNA + fluorescent tag" if p>.40 else "Live DNA")
     caption(im,"An independent fluorescence channel supports the imaging-based identity check.")
     return im
@@ -926,28 +890,233 @@ def closing(t):
     return im
 
 
+STORY = SOURCE / "story"
+
+
+def karyotype_open(t):
+    im = shot("Karyotype analysis", "What is in a cell’s chromosome set?")
+    plate(im, STORY / "karyotype.webp", (425, 372), (680, 421))
+    d = ImageDraw.Draw(im)
+    p = camera(t, 1.1, 2.25)
+    if p:
+        d.rounded_rectangle((86, 161, 166, 295), radius=9, outline=tone(ACCENT, p), width=2)
+        line(im, (797, 183), (797, 565), tone(HIRULE, p))
+    for i, (title, detail) in enumerate((("Identity", "Which chromosome?"),
+                                           ("Copy number", "How many copies?"),
+                                           ("Structure", "Has it changed?"))):
+        q = ramp(t, 1.4+i*1.72, 2.2+i*1.72)
+        y = 213+i*113
+        text(im, (849, y), title, 34, tone(WHITE, q), True)
+        text(im, (850, y+46), detail, 25, tone(MUTED, q))
+    caption(im, "G-banded metaphase, arranged by reference chromosome annotations.")
+    return im
+
+
+def living_question(t):
+    im = shot("Live mitosis", "When does an abnormal karyotype arise?")
+    frame_idx = min(18, round(mix(1, 18, camera(t, .15, 6.3))))
+    paste(im, live("mitosis", frame_idx, "dna", 482), (640, 365))
+    p = ramp(t, 5.2, 6.3)
+    for x in (285, 995):
+        text(im, (x, 342), "?", 69, tone(MUTED, p), True, "ma")
+    label(im, 640, 595, "Which chromosomes went to each daughter?", p, WHITE, 29)
+    caption(im, "A general method for stable chromosome-identity labeling through mitosis is still missing.")
+    return im
+
+
+def pipeline_node(im, x, y, title, detail, progress, accent=False):
+    d = ImageDraw.Draw(im)
+    key = "#cab6fa" if accent else MUTED
+    d.rounded_rectangle((x, y, x+174, y+79), radius=11,
+                        fill=tone("#17121e" if accent else "#101218", progress),
+                        outline=tone("#6c588e" if accent else HIRULE, progress), width=2)
+    title_size = min(23, int(23*156/font(23, True).getlength(title)))
+    text(im, (x+87, y+26), title, title_size, tone(WHITE, progress), True, "mm")
+    text(im, (x+87, y+56), detail, 16, tone(key, progress), False, "mm")
+
+
+def architecture(t, emphasis=False):
+    im = shot("ChromoWorld / system overview", "How ChromoWorld reads a live-cell karyotype")
+    xs = (78, 284, 490, 696)
+    upper = (("G-banding / FISH", "Fixed-cell images"), ("ChromoPix", "2D identity & masks"),
+             ("ChromoLift", "2D to 3D features"), ("Reference atlas", "Labeled 3D shapes"))
+    lower = (("Live 3D + time", "DNA microscopy"), ("ChromoPose", "3D instances"),
+             ("Tracking", "Link across frames"), ("Live query", "Measured 3D shape"))
+    stages = ((upper, 255, 1.25, "BUILD THE IDENTITY REFERENCE"),
+              (lower, 442, 9.0, "FOLLOW CHROMOSOMES IN LIVING CELLS"))
+    for nodes, y, delay, heading in stages:
+        status = .46 if emphasis and y==255 else 1
+        p = status if emphasis else ramp(t, delay-.65, delay+.2)
+        text(im, (79, y-36), heading, 18, tone(MUTED, p), True)
+        if y == 255:
+            plate(im,SOURCE/"banding-dna.webp",(692,y-57),(69,69),p)
+            plate(im,SOURCE/"example-dna.webp",(764,y-57),(69,69),p)
+        else:
+            paste(im,light(live("mitosis",9,"dna",76),p),(729,y-53))
+        for i, (title, detail) in enumerate(nodes):
+            p = status if emphasis else ramp(t, delay+i*.58, delay+i*.58+.72)
+            pipeline_node(im, xs[i], y, title, detail, p, title in ("ChromoPix","ChromoLift","ChromoPose"))
+            if i and p:
+                linked(im, ((xs[i-1]+174,y+39),(xs[i]-4,y+39)), tone(AXIS,p),p)
+    p = 1 if emphasis else ramp(t, 12.2, 13.5)
+    for y in (294,481):
+        linked(im, ((870,y),(903,y),(903,389),(932,389)), tone("#ab96ca",p), p, marker=False)
+    pipeline_node(im, 933, 350, "ChromoID", "Shape-based retrieval", p, True)
+    line(im, (1020,429), (1020,550), tone("#ab96ca",p), 2)
+    text(im, (1020,576), "Identity + trajectory", 22, tone(WHITE,p), True, "mm")
+    text(im, (78,575), "ChromoPhy", 29, tone("#cab6fa",p), True)
+    text(im, (257,583), "Lift fixed-cell references and match live instances in 3D", 22, tone(MUTED,p))
+    caption(im, "The live branch provides measured shapes and links them in time." if emphasis else
+            "The 3D atlas and the live-cell measurements meet in the same physical feature space.")
+    return im
+
+
+def cross_domain(t):
+    im = shot("Fig. 2B–D / held-out evaluation", "The same models face a different preparation")
+    if t < 5.6:
+        plate(im,STORY/"banding-transfer-metrics.webp",(454,378),(736,422))
+        text(im,(882,273),"One training state",29,WHITE,True)
+        text(im,(883,320),"G-banding",23,MUTED)
+        text(im,(882,395),"Two test states",29,WHITE,True)
+        text(im,(883,440),"Banded and rehydrated",23,MUTED)
+        caption(im,"Fig. 2B. Each line follows a metric for the same trained model across two preparations.")
+        return im
+    p = ramp(t, 5.75, 6.7)
+    q = ramp(t, 9.35, 10.35)
+    plate(im, STORY/"fish-held-out.webp", (329,369), (405,405))
+    first = fitted(STORY/"banding-only-v11.webp",405,405)
+    second = fitted(STORY/"banding-only-v12.webp",405,405)
+    paste(im, light(blend(first,second,q),p), (950,369))
+    line(im, (640,177),(640,553),HIRULE)
+    label(im, 329, 589, "FISH reference · Chr1")
+    label(im, 950, 589, ("YOLOv11-Seg" if q<.5 else "YOLOv12-Seg")+" · trained on Banding", p, WHITE, 24)
+    caption(im, "Banding-trained baselines score well in-domain and lose accuracy on rehydrated chromosomes.")
+    return im
+
+
+@lru_cache(maxsize=1)
+def invariant_example():
+    from scipy.ndimage import distance_transform_edt, gaussian_filter
+
+    # Illustrative morphology-preserving view from the same archived Chr1 mask.
+    _, _, isolated, bbox = microscopy()
+    original = isolated.crop(bbox)
+    with Image.open(SOURCE/"example-mask.png") as source:
+        mask = source.convert("L").resize(isolated.size,Image.Resampling.NEAREST).crop(bbox)
+    binary = np.pad(np.asarray(mask)>0,6)
+    distance = distance_transform_edt(binary)
+    core = gaussian_filter(distance,1.6)
+    glow = .34*gaussian_filter(binary.astype(float),1.2)+.66*core/max(1e-6,core.max())
+    transformed = Image.fromarray(np.uint8(np.clip(glow,0,1)*255)).convert("RGB")
+    return original, transformed
+
+
+def invariant_learning(t):
+    im = shot("ChromoPix / mixed supervision", "Keep identity when texture changes")
+    clean, changed = invariant_example()
+    for i, (view, label_name) in enumerate(((clean,"Reference view"),(changed,"Shape-preserving view"))):
+        p = ramp(t, .35+i*1.05, 1.15+i*1.05)
+        x = 306 + i*666
+        copy = view.copy()
+        copy.thumbnail((344,250),Image.Resampling.LANCZOS)
+        if max(copy.size)<210:
+            scale = 230/max(copy.size)
+            copy = copy.resize((round(copy.width*scale),round(copy.height*scale)),Image.Resampling.LANCZOS)
+        paste(im,light(copy,p),(x,329))
+        label(im,x,476,label_name,p,WHITE,26)
+    p = ramp(t, 5.0, 6.1)
+    for x in (306,972):
+        linked(im, ((x,514),(x,545),(640,545)),tone(ACCENT,p),p,marker=False)
+    label(im,640,568,"Align the features of the same chromosome",p,ACCENT,29)
+    caption(im, "Standard identity labels supervise the masks. Paired views teach feature invariance.")
+    return im
+
+
+def projection_failure(t):
+    im = shot("Fig. 5A–B / cross-dimensional test", "Flattening the cell can collapse identities")
+    for i, (filename, name) in enumerate((("mip-raw","Live DNA projection"),
+                                         ("mip-naive","Direct projection IDs"),
+                                         ("mip-optimal","Isolated, optimal projection IDs"))):
+        p = ramp(t, i*.75+.1, i*.75+.7)
+        x = 248 + i*392
+        plate(im, STORY/(filename+".webp"), (x,374),(320,357),p)
+        label(im,x,586,name,p,WHITE,23)
+    caption(im, "Optimizing the projection partially restores identity structure; the remaining gap is in 3D.")
+    return im
+
+
+@lru_cache(maxsize=1)
+def retrieval_comparison_clouds():
+    with np.load(FIG4.parent/"fig5/LiftedMIP_umap_embed.npz", allow_pickle=False) as data:
+        xy = data["lifted_opt_mip_embedding"]
+        ys = [data[k] for k in ("lifted_opt_mip_y_mip","lifted_opt_mip_y_canvas","lifted_opt_mip_y")]
+    project = Projection((0,0,339,310),[xy.min(0)-.4,xy.max(0)+.4])
+    return [raster_cloud(xy,y,project) for y in ys]
+
+
+def retrieval_comparison(t):
+    im = shot("Fig. 5 / comparable identity assignments", "The same 3D instances, three identity maps")
+    for i,(view,label_name) in enumerate(zip(retrieval_comparison_clouds(),
+                    ("Direct projection","Optimal projection","ChromoPhy"))):
+        p = ramp(t,.35+i*.75,1.1+i*.75)
+        x = 77+391*i
+        paste_cloud(im,light(view,p),(x,215))
+        label(im,x+170,559,label_name,p,"#c9b6fa" if i==2 else WHITE,28)
+    caption(im, "The saved UMAP coordinates are shared. Color shows each method’s assigned chromosome class.")
+    return im
+
+
+def batch_lift(t):
+    im = shot("ChromoLift / flow matching", "Lift the descriptors, then build the atlas")
+    reference, projection = isolated_views(170,180)
+    paste(im,projection,(224,303))
+    paste(im,reference,(1056,303))
+    label(im,224,447,"2D projections")
+    label(im,1056,447,"3D shape descriptors")
+    p = camera(t,.8,5.6)
+    d=ImageDraw.Draw(im)
+    for i in range(11):
+        x=400+(i%4)*34
+        y=240+(i//4)*55
+        line(im,(x,y),(x+380,y+17*np.sin(i)),tone("#6f5a9d",.35),1)
+        blend_pos=clamp(p-(i%4)*.047)
+        dot(d,mix(x,x+380,blend_pos),mix(y,y+17*np.sin(i),blend_pos),4,PALETTE[i*2])
+    label(im,638,447,"Flow matching",1,WHITE,28)
+    caption(im,"Self-supervised projection pairs teach the mapping. Compact feature vectors can be lifted in batches.")
+    return im
+
+
 # A short dip separates changes of specimen or scale. Aligned views and
 # object-to-point handoffs cut in place so no pair of headlines overlaps.
 SCENES = [
-    (0,opening,False),
-    (11,banding,True),
-    (25,virtual_fish,False),
-    (41,morphology,False),
-    (50,to_one_point,False),
-    (56,population,False),
-    (66,native_comparison,True),
-    (72,centroid_comparison,False),
-    (78,segmentation,True),
-    (86,lift_training,False),
-    (94,atlas_and_match,True),
-    (103,live_identity,True),
-    (109,patient_division,True),
-    (122,micromanipulation,True),
-    (128,qpcr_chapter,False),
-    (132.5,assay_evidence,False),
-    (139,treatment_followup,True),
-    (151,broader_recovery,False),
-    (161,closing,True),
+    (0,karyotype_open,False),
+    (11,living_question,False),
+    (20,architecture,True),
+    (38,banding,True),
+    (46,cross_domain,False),
+    (59,lambda t: virtual_fish(t*.92),True),
+    (71,invariant_learning,False),
+    (87,lambda t: morphology(t*1.22),True),
+    (94,lambda t: to_one_point(t*1.25),False),
+    (98,lambda t: population(t*1.52),False),
+    (104,lambda t: native_comparison(t+4.2),False),
+    (106,centroid_comparison,False),
+    (111,projection_failure,True),
+    (117,lambda t: architecture(t,True),False),
+    (119,segmentation,False),
+    (127,lambda t: lift_training(t*.94),False),
+    (137,batch_lift,False),
+    (147,retrieval_comparison,True),
+    (156,lambda t: atlas_and_match(t+5.9),False),
+    (162,lambda t: live_identity(t,"chr3"),True),
+    (168,live_identity,False),
+    (174,patient_division,True),
+    (185,micromanipulation,True),
+    (190,qpcr_chapter,False),
+    (195,assay_evidence,False),
+    (202,treatment_followup,True),
+    (213,broader_recovery,False),
+    (221,closing,True),
 ]
 
 
@@ -995,14 +1164,14 @@ def main():
     parser.add_argument("--output-dir",type=Path,default=ASSETS,help="Destination for the silent movie and poster")
     args=parser.parse_args()
     if args.preview:
-        ranges=((3.5,10.),(131.5,145.5),(151.,156.5),(161.,168.))
+        ranges=((15.,29.),(56.,77.),(92.,105.),(142.,154.),(198.,207.),(222.,228.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
         write_video(args.preview,times,preview=True)
         return
     args.output_dir.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(dir=args.output_dir) as staging:
         poster=Path(staging)/"intro-poster.webp"
-        render(119.4).save(poster,"WEBP",quality=94)
+        render(34.).save(poster,"WEBP",quality=94)
         video=Path(staging)/"intro.mp4"
         write_video(video,(i/FPS for i in range(DURATION*FPS)))
         video.replace(args.output_dir/video.name)
