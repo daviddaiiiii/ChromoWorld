@@ -1,0 +1,230 @@
+---
+import palette from '../data/palette.json';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const classes = Object.entries(palette);
+const modes = [
+  { key: 'banding', label: 'G-banding', note: 'Dehydrated chromosomes' },
+  { key: 'fish', label: 'FISH', note: 'Rehydrated chromosomes' },
+];
+---
+<section class="shell atlas-section" id="class-atlas" data-assets={base + '/assets/atlas/'}>
+  <div class="atlas-bar">
+    <div class="atlas-bar-title">
+      <div><h2>Chromosome atlas</h2><p class="caption" id="atlas-summary">Loading reference instances…</p></div>
+      <label class="control check-control"><input id="atlas-class-only" type="checkbox" /> Show selected class only</label>
+    </div>
+    <div class="chromosome-picker" role="group" aria-label="Choose a chromosome class">
+      {classes.map(([id, color]) => (
+        <button type="button" data-chromosome={id} aria-pressed={id === '14' ? 'true' : 'false'} aria-label={'Chromosome ' + id}>
+          <i style={'--chr:' + color} aria-hidden="true"></i>{id}
+        </button>
+      ))}
+    </div>
+  </div>
+  <div class="atlas-pair">
+    {modes.map(mode => (
+      <article class="atlas-panel" data-atlas-mode={mode.key}>
+        <header class="atlas-panel-header"><h3>{mode.label}</h3><span>{mode.note}</span></header>
+        <div class="atlas-layer-labels"><span>Reference annotation</span><span>ChromoPix prediction</span></div>
+        <div class="atlas-image">
+          <div class="atlas-wipe" data-wipe>
+            <img data-field alt="" width="640" height="640" />
+            <canvas data-outline width="640" height="640" aria-hidden="true"></canvas>
+            <canvas data-prediction width="640" height="640" aria-hidden="true"></canvas>
+            <div class="atlas-divider" aria-hidden="true"><span>‹ ›</span></div>
+            <input data-reveal type="range" min="0" max="100" value="50" disabled
+                   aria-label={mode.label+' annotation and prediction split'} />
+          </div>
+        </div>
+        <div class="atlas-panel-footer">
+          <div class="atlas-examples" data-examples role="group" aria-label={mode.label + ' examples'}></div>
+          <p data-example-note class="caption"></p>
+          <p data-prediction-note class="caption"></p>
+        </div>
+      </article>
+    ))}
+  </div>
+  <p class="scientific-note">Examples are selected for agreement with the test-set annotations. The prediction side highlights the selected class.</p>
+  <p id="atlas-status" class="status" role="status"></p>
+</section>
+
+<script>
+  import palette from '../data/palette.json';
+
+  interface Example {field:string; instance:string; polygon:[number,number][]; split:string; cellLine:string}
+  type Mode = 'banding' | 'fish';
+  type Index = Record<Mode, Record<string, Example[]>>;
+  type Prediction = [classIndex: number, coordinates: number[]];
+  interface View { predictions: Prediction[]; chromosome: string }
+
+  const root = document.querySelector<HTMLElement>('#class-atlas')!;
+  const url = root.dataset.assets!;
+  const status = root.querySelector<HTMLElement>('#atlas-status')!;
+  const summary = root.querySelector<HTMLElement>('#atlas-summary')!;
+  const classOnly = root.querySelector<HTMLInputElement>('#atlas-class-only')!;
+  const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-chromosome]')];
+  const panels = [...root.querySelectorAll<HTMLElement>('[data-atlas-mode]')];
+  const selection: Record<Mode, number> = {banding: 0, fish: 0};
+  const colors: Record<string, string> = palette;
+  const classIds = Object.keys(palette);
+  const predictionCache = new Map<string, Promise<Prediction[]>>();
+  const activeViews = new Map<HTMLElement, View>();
+  const requestIds = new Map<HTMLElement, number>();
+  const initial = new URL(location.href).searchParams.get('class') ?? '';
+  let chr = Object.hasOwn(colors, initial) ? initial : '14';
+  let index: Index;
+
+  function polygon(ctx: CanvasRenderingContext2D, points: number[], color: string, highlighted: boolean, reference = false) {
+    ctx.beginPath();
+    ctx.moveTo(points[0]*640, points[1]*640);
+    for (let i = 2; i < points.length; i += 2) ctx.lineTo(points[i]*640, points[i+1]*640);
+    ctx.closePath();
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = color+(reference ? '32' : highlighted ? '8c' : '38');
+    ctx.fill();
+    if (highlighted) {
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#131119';
+      ctx.stroke();
+    }
+    ctx.lineWidth = highlighted ? 3.2 : 1.65;
+    ctx.strokeStyle = color+(highlighted ? '' : '9c');
+    ctx.stroke();
+  }
+
+  function drawPrediction(panel: HTMLElement, view: View) {
+    const ctx = panel.querySelector<HTMLCanvasElement>('[data-prediction]')!.getContext('2d')!;
+    ctx.clearRect(0, 0, 640, 640);
+    const target = classIds.indexOf(view.chromosome);
+    const matches = view.predictions.filter(([cls]) => cls === target);
+    if (!classOnly.checked) {
+      for (const [cls, points] of view.predictions) {
+        if (cls !== target) polygon(ctx, points, colors[classIds[cls]], false);
+      }
+    }
+    for (const [, points] of matches) polygon(ctx, points, colors[view.chromosome], true);
+    const note = panel.querySelector<HTMLElement>('[data-prediction-note]')!;
+    note.textContent = matches.length === 0
+      ? 'ChromoPix found no Chr'+view.chromosome+' instances in this field.'
+      : 'ChromoPix predicted '+matches.length+' Chr'+view.chromosome+' '+(matches.length === 1 ? 'instance' : 'instances')+' in this field.';
+  }
+
+  function getPredictions(field: string) {
+    const name = field.split('/').pop()!.replace(/\.[^.]+$/, '.json');
+    const path = url+'prediction/'+name;
+    let pending = predictionCache.get(path);
+    if (!pending) {
+      pending = fetch(path).then(r => {
+        if (!r.ok) throw new Error('Prediction asset unavailable');
+        return r.json() as Promise<Prediction[]>;
+      }).catch(error => {
+        predictionCache.delete(path);
+        throw error;
+      });
+      predictionCache.set(path, pending);
+    }
+    return pending;
+  }
+
+  async function setExample(panel: HTMLElement) {
+    const mode = panel.dataset.atlasMode as Mode;
+    const chromosome = chr;
+    const item = index[mode][chromosome][selection[mode]];
+    const field = panel.querySelector<HTMLImageElement>('[data-field]')!;
+    const caption = panel.querySelector<HTMLElement>('[data-example-note]')!;
+    const note = panel.querySelector<HTMLElement>('[data-prediction-note]')!;
+    const slider = panel.querySelector<HTMLInputElement>('[data-reveal]')!;
+    const label = mode === 'fish' ? 'FISH' : 'G-banding';
+    const requestId = (requestIds.get(panel) ?? 0)+1;
+    requestIds.set(panel, requestId);
+    panel.querySelectorAll<HTMLButtonElement>('[data-example]').forEach(b =>
+      b.setAttribute('aria-pressed', String(Number(b.dataset.example) === selection[mode])));
+    panel.setAttribute('aria-busy','true');
+    caption.textContent = 'Loading Chr'+chromosome+'…';
+    const image = new Image();
+    image.src = url+item.field;
+    try {
+      const [predictions] = await Promise.all([getPredictions(item.field), image.decode()]);
+      if (requestId !== requestIds.get(panel)) return;
+      const view = {predictions, chromosome};
+      activeViews.set(panel, view);
+      field.alt = label+' field with an annotated chromosome '+chromosome;
+      field.src = image.src;
+      const ref = panel.querySelector<HTMLCanvasElement>('[data-outline]')!.getContext('2d')!;
+      ref.clearRect(0, 0, 640, 640);
+      polygon(ref, item.polygon.flat(), colors[chromosome], true, true);
+      drawPrediction(panel, view);
+      const xs = item.polygon.map(([x]) => x);
+      const center = (Math.min(...xs)+Math.max(...xs))*50;
+      slider.value = String(Math.round(Math.min(80, Math.max(20, center))));
+      slider.dispatchEvent(new Event('input'));
+      slider.disabled = false;
+      caption.textContent = 'Chr'+chromosome+' · '+(item.split === 'test' ? 'Test set' : 'Training set')+(item.cellLine ? ' · '+item.cellLine : '');
+    } catch {
+      if (requestId !== requestIds.get(panel)) return;
+      activeViews.delete(panel);
+      field.removeAttribute('src');
+      slider.disabled = true;
+      panel.querySelectorAll('canvas').forEach(canvas => canvas.getContext('2d')!.clearRect(0, 0, 640, 640));
+      caption.textContent = 'Could not load this example. Select a thumbnail to retry.';
+      note.textContent = '';
+    } finally {
+      if (requestId === requestIds.get(panel)) panel.removeAttribute('aria-busy');
+    }
+  }
+
+  function renderClass() {
+    for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.chromosome===chr));
+    const nBand = index.banding[chr].length, nFish = index.fish[chr].length;
+    summary.textContent = 'Chr'+chr+' · '+nBand+' G-banding and '+nFish+' FISH examples';
+    for (const panel of panels) {
+      const mode = panel.dataset.atlasMode as Mode;
+      const samples = panel.querySelector<HTMLElement>('[data-examples]')!;
+      samples.replaceChildren(...index[mode][chr].map((item, i) => {
+        const button = document.createElement('button');
+        button.type='button';
+        button.dataset.example=String(i);
+        button.setAttribute('aria-label', (mode === 'fish' ? 'FISH' : 'G-banding')+' example '+(i+1));
+        button.style.setProperty('--chr', colors[chr]);
+        const img = document.createElement('img');
+        img.width=180; img.height=180; img.alt=''; img.decoding='async'; img.src=url+item.instance;
+        button.append(img);
+        button.addEventListener('click', () => { selection[mode]=i; setExample(panel); });
+        return button;
+      }));
+      setExample(panel);
+    }
+  }
+
+  fetch(url+'index.json').then(r => {
+    if (!r.ok) throw new Error('Atlas index missing');
+    return r.json();
+  }).then((entries: Index) => {
+    index=entries;
+    buttons.forEach(button => button.addEventListener('click', () => {
+      chr=button.dataset.chromosome!;
+      selection.banding=0; selection.fish=0;
+      renderClass();
+      const address=new URL(location.href);
+      address.searchParams.set('class',chr);
+      history.replaceState(null,'',address);
+    }));
+    classOnly.addEventListener('change', () => {
+      for (const [panel, view] of activeViews) drawPrediction(panel, view);
+    });
+    panels.forEach(panel => {
+      const wipe = panel.querySelector<HTMLElement>('[data-wipe]')!;
+      const slider = panel.querySelector<HTMLInputElement>('[data-reveal]')!;
+      slider.addEventListener('input', () => {
+        wipe.style.setProperty('--split', slider.value+'%');
+        slider.setAttribute('aria-valuetext', slider.value+'% reference, '+(100-Number(slider.value))+'% prediction');
+      });
+      slider.dispatchEvent(new Event('input'));
+    });
+    renderClass();
+  }).catch(() => {
+    status.textContent='Could not load the reference atlas.';
+    summary.textContent='Atlas unavailable';
+    buttons.forEach(b=>b.disabled=true);
+  });
+</script>

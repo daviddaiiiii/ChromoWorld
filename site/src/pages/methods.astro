@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const repo = 'https://github.com/daviddaiiiii/ChromoWorld/blob/main/';
+const models = [
+  {id:'chromopix', title:'ChromoPix', detail:'Fixed-cell DNA image → chromosome instances and identity predictions', note:'Learns across banded and bandless preparations and accepts a chromosome identity prompt.', picture:'fish-preview.webp', code:'Code/ChromoPix/README.md'},
+  {id:'chromopose', title:'ChromoPose', detail:'Live-cell DNA volume → 3D instance masks', note:'Uses geometry to separate individual chromosomes in volumetric images. Tracking links the resulting instances across time.', picture:'pose-preview.webp', code:'Code/Analyze/fig5/README.md#4d-chromopose-pipeline'},
+  {id:'chromolift', title:'ChromoLift', detail:'2D shape descriptors → lifted 3D descriptors', note:'Learns from paired projections and measured 3D features of live-cell instances.', picture:'lift-preview.webp', code:'Code/ChromoPhy/chromolift/README.md'},
+  {id:'chromoid', title:'ChromoID', detail:'Live 3D descriptors and lifted references → ranked identities', note:'Compares live instances with global prototypes and uses local assignment to resolve candidate identities.', picture:'live-preview.webp', code:'Code/ChromoPhy/README.md'}
+];
+---
+<Base title="Methods">
+  <section class="shell page-head">
+    <p class="eyebrow">Models & reproduction</p><h1>From pixels to identity.</h1>
+    <p class="lead">ChromoPix learns from fixed cells. ChromoPhy transfers that information to live 3D instances.</p>
+    <div class="actions" style="margin-top:16px"><a class="button primary" href={repo+'docs/downloads.md'}>Weights & downloads</a><a class="button" href={repo+'README.md'}>Run the code</a></div>
+  </section>
+  <section class="shell section">
+    {models.map(m=><article class="model-row" id={m.id}>
+      <div><h2>{m.title}</h2><p><b>{m.detail}</b></p><p>{m.note}</p><div class="actions">
+        <a href={repo+m.code}>Method and commands</a>
+        {m.id==='chromopix' && <a href={base+'/virtual-fish/#class-atlas'}>Inspect predictions</a>}
+        {m.id==='chromopose' && <a href={base+'/live-4d/compare/'}>Compare segmentations</a>}
+      </div></div>
+      <img src={base+'/assets/'+m.picture} alt={m.title+' example data'} loading="lazy"/>
+    </article>)}
+  </section>
+</Base>

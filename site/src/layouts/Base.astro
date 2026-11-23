@@ -1,0 +1,48 @@
+---
+import '../styles/site.css';
+const { title, description = 'ChromoWorld connects chromosome identity in fixed cells with chromosome segregation in living cells.' } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const nav = [
+  ['Fixed 2D', '/virtual-fish/'],
+  ['Live 4D', '/live-4d/'],
+  ['Data', '/datasets/'],
+  ['Methods', '/methods/'],
+];
+const here = Astro.url.pathname;
+const canonical = Astro.site ? new URL(here, Astro.site) : undefined;
+const pageTitle = title ? title + ' · ChromoWorld' : 'ChromoWorld — Chromosome identity in motion';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{pageTitle}</title>
+    {canonical && <link rel="canonical" href={canonical}/>}
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    {Astro.site && <meta property="og:image" content={new URL(base+'/assets/social-preview.png',Astro.site)} />}
+    <link rel="icon" href={base + '/assets/favicon.svg'} type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="shell topbar">
+        <a class="brand" href={base + '/'} aria-label="ChromoWorld home">
+          <svg width="23" height="23" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3c0 6 12 12 12 18M18 3C18 9 6 15 6 21" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round"/></svg>
+          ChromoWorld
+        </a>
+        <nav aria-label="Main navigation">
+          {nav.map(([label, url]) => <a href={base + url} aria-current={here.startsWith(base + url) ? 'page' : undefined}>{label}</a>)}
+        </nav>
+        <a class="repo-link" href="https://github.com/daviddaiiiii/ChromoWorld">GitHub <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+    <main id="content"><slot /></main>
+    <footer class="shell site-footer">
+      <div><a class="brand" href={base + '/'}>ChromoWorld</a><p>Chromosome identity across states and dimensions.</p></div>
+      <div class="footer-links"><a href={base + '/datasets/'}>Data access</a><a href={base + '/methods/'}>Reproduce</a><a href="https://github.com/daviddaiiiii/ChromoWorld">Source code</a></div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,197 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Live 4D">
+  <section class="research-head">
+    <div class="shell page-head">
+      <p class="eyebrow">Living cells · Tracking</p>
+      <h1>Follow chromosomes through mitosis.</h1>
+      <p class="lead">Scrub through tracked chromosomes and explore fluorescence-tagged targets.</p>
+      <div class="actions"><a class="button secondary" href={base+'/live-4d/compare/'}>Compare segmentation methods</a></div>
+    </div>
+  </section>
+  <section class="shell live-section" id="live-explorer" data-assets={base + '/assets/live/'}>
+    <div class="viewer">
+      <div class="toolbar">
+        <label class="sample-select">Sample <select id="live-sample" class="control" disabled><option>Loading…</option></select></label>
+        <label>View <select id="live-face" class="control" disabled><option value="front">Front</option><option value="back">Back</option></select></label>
+        <button id="live-key" class="control" type="button" disabled>Reference frame</button>
+        <button id="live-link" class="control" type="button" disabled>Copy view link</button>
+      </div>
+      <div class="views">
+        <figure>
+          <figcaption id="live-mask-title">Tracked chromosomes · Front</figcaption>
+          <div class="image-stage">
+            <img id="live-mask" alt="Shaded tracked chromosome instances" width="420" height="420" />
+            <span class="scale"><b></b>5 µm</span>
+          </div>
+        </figure>
+        <figure>
+          <figcaption>DNA · Maximum projection</figcaption>
+          <div class="image-stage">
+            <img id="live-dna" alt="DNA image at the same time point" width="420" height="420" />
+            <span class="scale"><b></b>5 µm</span>
+          </div>
+        </figure>
+      </div>
+      <div class="timeline">
+        <button id="live-play" class="control" type="button" aria-pressed="false" disabled>Play</button>
+        <input id="live-time" type="range" min="0" max="0" value="0" aria-label="Time point" disabled />
+        <output id="live-frame" for="live-time">—</output>
+      </div>
+      <div class="layer-list" id="live-tag-layers" hidden>
+        <label><input type="checkbox" id="live-tag" checked /> Fluorescence Tag</label>
+        <label><input type="checkbox" id="live-candidates" checked /> Highlight targets</label>
+      </div>
+    </div>
+    <p class="status" id="live-status" role="status"></p>
+  </section>
+</Base>
+
+<style>
+  .live-section{padding-block:28px 40px}
+  .live-section .image-stage{container-type:inline-size;touch-action:auto}
+  .scale{position:absolute;right:12px;bottom:10px;color:#fff;font-size:.75rem;text-align:center;background:#0009;padding:2px 4px;line-height:1.2}
+  .scale b{display:block;background:#fff;height:2px;margin:0 auto 3px}
+  .live-section .status{margin-top:12px}
+</style>
+
+<script>
+  interface Sample {
+    key:string; name:string; experiment?:string|null; spacing:number[]; xySize:number;
+    reference:number; frames:{t:number}[];
+  }
+  function get<T extends Element>(id:string){return document.querySelector<T>('#'+id)!;}
+  const root = get<HTMLElement>('live-explorer');
+  const url = root.dataset.assets!;
+  const sampleMenu = get<HTMLSelectElement>('live-sample');
+  const time = get<HTMLInputElement>('live-time');
+  const face = get<HTMLSelectElement>('live-face');
+  const tags = get<HTMLInputElement>('live-tag');
+  const candidates = get<HTMLInputElement>('live-candidates');
+  const play = get<HTMLButtonElement>('live-play');
+  const reference = get<HTMLButtonElement>('live-key');
+  const share = get<HTMLButtonElement>('live-link');
+  const mask = get<HTMLImageElement>('live-mask');
+  const dna = get<HTMLImageElement>('live-dna');
+  const status = get<HTMLElement>('live-status');
+  const query = new URLSearchParams(location.search);
+  let samples: Sample[], sample: Sample;
+  let tick: number | undefined;
+  let generation = 0, pending = false;
+
+  function load(path: string) {
+    const image = new Image();
+    image.src = path;
+    return image.decode();
+  }
+
+  async function refresh() {
+    const chosen = sample;
+    const frame = chosen.frames[Number(time.value)];
+    const side = face.value;
+    const tagged = Boolean(chosen.experiment);
+    const tag = tagged && tags.checked ? '-tag' : '';
+    const target = tagged && candidates.checked ? 'candidates' : 'mask';
+    const facing = side === 'back' ? '-back' : '';
+    const folder = tagged ? chosen.key : 'ordinary/'+chosen.key;
+    const prefix = url+folder+'/'+frame.t+'-';
+    const maskPath = prefix+target+tag+facing+'.webp';
+    const dnaPath = prefix+'dna'+tag+facing+'.webp';
+    const id = ++generation;
+    pending = true;
+    share.disabled = true;
+    try {
+      await Promise.all([load(maskPath),load(dnaPath)]);
+      if (id !== generation) return;
+      mask.src = maskPath;
+      dna.src = dnaPath;
+      get<HTMLElement>('live-mask-title').textContent = 'Tracked chromosomes · '+(side === 'back' ? 'Back' : 'Front');
+      get<HTMLOutputElement>('live-frame').value = 't = '+frame.t;
+      root.querySelectorAll<HTMLElement>('.scale b').forEach(bar => {
+        bar.style.width = (500/chosen.xySize/chosen.spacing[2])+'cqw';
+      });
+      const params = new URLSearchParams({sample:chosen.key,t:String(frame.t),view:side});
+      if (tagged) {
+        params.set('tag', tag ? '1' : '0');
+        params.set('candidates', target === 'candidates' ? '1' : '0');
+      }
+      history.replaceState(null,'',location.pathname+'?'+params);
+      status.textContent = '';
+      share.disabled = false;
+    } catch {
+      if (id === generation) status.textContent = 'Could not load this time point. Choose another frame to retry.';
+    } finally {
+      if (id === generation) pending = false;
+    }
+  }
+
+  function stop() {
+    window.clearInterval(tick);
+    tick = undefined;
+    play.textContent = 'Play';
+    play.setAttribute('aria-pressed','false');
+  }
+
+  function selectSample(initial=false) {
+    stop();
+    sample = samples.find(item => item.key === sampleMenu.value) ?? samples[0];
+    sampleMenu.value = sample.key;
+    time.max = String(sample.frames.length-1);
+    const requested = initial && query.has('t') ? Number(query.get('t')) : sample.reference;
+    const index = sample.frames.findIndex(f => f.t === requested);
+    time.value = String(index < 0 ? 0 : index);
+    time.disabled = sample.frames.length < 2;
+    play.disabled = time.disabled;
+    get<HTMLElement>('live-tag-layers').hidden = !sample.experiment;
+    tags.checked = initial ? query.get('tag') !== '0' : true;
+    candidates.checked = initial ? query.get('candidates') !== '0' : true;
+    void refresh();
+  }
+
+  async function manifest(path: string): Promise<Sample[]> {
+    const response = await fetch(url+path);
+    if (!response.ok) throw new Error('Sample index unavailable');
+    return response.json();
+  }
+
+  Promise.all([manifest('ordinary/index.json'), manifest('index.json')]).then(([ordinary, entries]) => {
+    const tagged = entries.filter(entry => entry.experiment);
+    samples = [...ordinary,...tagged];
+    function group(label: string, members: Sample[]) {
+      const options = document.createElement('optgroup');
+      options.label = label;
+      options.append(...members.map(item => new Option(item.name,item.key)));
+      return options;
+    }
+    sampleMenu.replaceChildren(group('Color by instance',ordinary),group('Fluorescence-tagged targets',tagged));
+    sampleMenu.value = query.get('sample') ?? 'mitosis';
+    face.value = query.get('view') === 'back' ? 'back' : 'front';
+    sampleMenu.disabled = face.disabled = reference.disabled = false;
+    selectSample(true);
+    sampleMenu.addEventListener('change',() => selectSample());
+    time.addEventListener('input',() => { stop(); void refresh(); });
+    [tags,candidates].forEach(el => el.addEventListener('change',() => void refresh()));
+    face.addEventListener('change',() => void refresh());
+    play.addEventListener('click',() => {
+      if (tick !== undefined) { stop(); return; }
+      play.textContent = 'Pause';
+      play.setAttribute('aria-pressed','true');
+      tick = window.setInterval(() => {
+        if (pending) return;
+        time.value = String((Number(time.value)+1)%sample.frames.length);
+        void refresh();
+      }, 720);
+    });
+    reference.addEventListener('click',() => {
+      stop();
+      time.value = String(Math.max(0,sample.frames.findIndex(f => f.t === sample.reference)));
+      void refresh();
+    });
+    share.addEventListener('click',async () => {
+      try { await navigator.clipboard.writeText(location.href); status.textContent='View link copied.'; }
+      catch { status.textContent='Copy the address to share this view.'; }
+    });
+  }).catch(() => { status.textContent='Could not load the sample index.'; });
+</script>

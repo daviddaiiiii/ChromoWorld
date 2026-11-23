@@ -1,0 +1,102 @@
+---
+import Base from '../layouts/Base.astro';
+import palette from '../data/palette.json';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Identity flow">
+  <section class="shell page-head">
+    <p class="eyebrow">Morphology · Fig. 4</p><h1>Identity flow</h1>
+    <p class="lead">Select a chromosome class and compare where it sits in each morphology embedding.</p>
+  </section>
+  <section class="shell section" id="shape-view" data-src={base+'/assets/centroids.json'} data-palette={JSON.stringify(palette)}>
+    <div class="controls"><label for="shape-chr">Chromosome</label>
+      <select class="control" id="shape-chr"><option value="">All classes</option>{[...Array.from({length:12},(_,i)=>String(i+1)),'X',...Array.from({length:10},(_,i)=>String(i+13)),'Y'].map(id=><option value={id}>{id}</option>)}</select>
+      <button type="button" class="control" data-space="split" aria-pressed="true">Banding & FISH</button>
+      <button type="button" class="control" data-space="joint" aria-pressed="false">Joint space</button>
+    </div>
+    <div class="chart-stage" id="shape-charts"></div>
+    <p class="scientific-note" id="shape-note" aria-live="polite">Points are chromosome-class centroids from saved UMAP coordinates.</p>
+    <p class="caption">Banding and FISH use separate coordinate fits. Source: saved ChromoWorld Fig. 4 release embeddings.</p>
+  </section>
+  <section class="shell section">
+    <p class="eyebrow">Fixed to live · Fig. 5</p><h2>Projection and lifting</h2>
+    <p class="lead">Explore saved live-cell feature spaces using the same 24-class legend.</p>
+    <div class="controls">
+      <button type="button" class="control" data-figure="naive" aria-pressed="true">Projected morphology</button>
+      <button type="button" class="control" data-figure="geometry" aria-pressed="false">3D morphology</button>
+      <button type="button" class="control" data-figure="lifted" aria-pressed="false">Lifted projection</button>
+    </div>
+    <div id="figure-charts" class="chart-stage" data-src={base+'/assets/live-centroids.json'} role="group" aria-label="Live chromosome class centroids"></div>
+    <p class="caption">Saved Fig. 5 release embeddings. Each view uses its own UMAP coordinates.</p>
+  </section>
+</Base>
+<script>
+  type Point = {label:string;x:number;y:number;n:number};
+  type Spaces = Record<string,Point[]>;
+  const root=document.querySelector<HTMLElement>('#shape-view')!;
+  const plot=document.querySelector<HTMLElement>('#shape-charts')!;
+  const note=document.querySelector<HTMLElement>('#shape-note')!;
+  const picker=document.querySelector<HTMLSelectElement>('#shape-chr')!;
+  const palette:Record<string,string>=JSON.parse(root.dataset.palette!);
+  const spaceButtons=[...document.querySelectorAll<HTMLButtonElement>('[data-space]')];
+  const liveButtons=[...document.querySelectorAll<HTMLButtonElement>('[data-figure]')];
+  const live=document.querySelector<HTMLElement>('#figure-charts')!;
+  const labels:Record<string,string>={banding:'G-banding',fish:'FISH',joint:'Joint embedding',naive:'Projected morphology',geometry:'3D morphology',lifted:'Lifted projection'};
+  const classId=(label:string)=>label==='22'?'X':label==='23'?'Y':String(Number(label)+1);
+  function node(tag:string, params:Record<string,string|number>, words?:string){
+    const element=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    for (const [k,v] of Object.entries(params))element.setAttribute(k,String(v));
+    if(words)element.textContent=words;
+    return element;
+  }
+  let mode='split', liveMode='naive', spaces:Spaces={}, liveSpaces:Spaces={};
+  function render(target:HTMLElement, input:Spaces, keys:string[]){
+    target.replaceChildren();
+    for(const key of keys){
+      const data=input[key];if(!data?.length)continue;
+      const svg=node('svg',{class:'chart',viewBox:'0 0 485 342',role:'group','aria-label':labels[key]+' chromosome class centroids'});
+      svg.append(node('text',{x:29,y:30,'font-size':16,'font-weight':660},labels[key]),
+        node('path',{d:'M50 57V288H455',fill:'none',stroke:'#c3bdce'}),
+        node('text',{x:236,y:321,'font-size':12},'UMAP 1'),
+        node('text',{x:16,y:191,transform:'rotate(-90 16 191)','font-size':12},'UMAP 2'));
+      const maxX=Math.max(...data.map(p=>p.x)),minX=Math.min(...data.map(p=>p.x));
+      const maxY=Math.max(...data.map(p=>p.y)),minY=Math.min(...data.map(p=>p.y));
+      const kept=picker.value;
+      for(const p of data){
+        const id=classId(p.label);
+        const x=64+(p.x-minX)/Math.max(maxX-minX,.001)*375;
+        const y=274-(p.y-minY)/Math.max(maxY-minY,.001)*207;
+        const circle=node('circle',{cx:x,cy:y,r:id===kept?10:6,fill:palette[id]??'#a5a0ae',
+          'fill-opacity':kept && kept!==id ? .18 : 1,stroke:'#d9cbea','stroke-opacity':kept && kept!==id ? .18 : .55,tabindex:0,role:'button','aria-label':`Chr${id}, ${p.n} instances`});
+        circle.append(node('title',{},`Chr${id} · ${p.n.toLocaleString()} instances`));
+        const choose=()=>{picker.value=id;update();};
+        circle.addEventListener('click',choose);
+        circle.addEventListener('keydown',e=>{if ((e as KeyboardEvent).key==='Enter' || (e as KeyboardEvent).key===' '){e.preventDefault();choose();}});
+        svg.append(circle);
+        if(id===kept)svg.append(node('text',{x:Math.min(429,x+12),y:y-10,'font-size':12,'font-weight':650},'Chr'+id));
+      }
+      target.append(svg);
+    }
+  }
+  function update(){
+    render(plot,spaces,mode==='split'?['banding','fish']:['joint']);
+    render(live,liveSpaces,[liveMode]);
+    const id=picker.value;
+    if(!id){note.textContent='Points are chromosome-class centroids from saved UMAP coordinates.';return;}
+    const counts=(mode==='split'?['banding','fish']:['joint']).map(key=>{
+      const count=spaces[key]?.find(p=>classId(p.label)===id)?.n;
+      return labels[key]+' '+(count?.toLocaleString()??'unavailable');
+    });
+    note.textContent='Chr'+id+' · '+counts.join(' · ')+' instances';
+  }
+  picker.addEventListener('change',update);
+  spaceButtons.forEach(button=>button.addEventListener('click',()=>{
+    mode=button.dataset.space!;spaceButtons.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));update();
+  }));
+  liveButtons.forEach(button=>button.addEventListener('click',()=>{
+    liveMode=button.dataset.figure!;liveButtons.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));update();
+  }));
+  Promise.all([fetch(root.dataset.src!).then(r=>r.json()),fetch(live.dataset.src!).then(r=>r.json())]).then(([a,b])=>{
+    spaces=a;liveSpaces=b;update();
+  }).catch(()=>{note.textContent='Could not load the saved embeddings.';});
+</script>

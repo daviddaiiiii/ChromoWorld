@@ -1,0 +1,203 @@
+---
+import Base from '../../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const methods = [
+  { key:'dna', name:'DNA' },
+  { key:'pose', name:'ChromoPose' },
+  { key:'chimp', name:'FAST-CHIMP（embedseg）' },
+  { key:'cpsam', name:'Cellpose-SAM' },
+];
+---
+<Base title="Live 4D · Compare segmentation">
+  <section class="research-head">
+    <div class="shell page-head">
+      <p class="eyebrow">Live 4D · Segmentation</p>
+      <h1>One cell, three methods.</h1>
+      <p class="lead">Compare the same DNA volume and time point across ChromoPose, FAST-CHIMP（embedseg） and Cellpose-SAM.</p>
+      <div class="actions"><a class="button secondary" href={base+'/live-4d/'}>Explore instance tracks</a></div>
+    </div>
+  </section>
+  <section class="shell comparison-section" id="live-comparison" data-assets={base+'/assets/compare/'}>
+    <div class="viewer">
+      <div class="toolbar">
+        <label>Collection <select class="control" data-collection disabled>
+          <option value="all">All sequences</option>
+          <option value="others">Other live-cell sequences</option>
+          <option value="chr3">Chr3-tagged</option>
+          <option value="chr18">Chr18-tagged</option>
+        </select></label>
+        <label class="sample-select">Sample <select class="control" data-case disabled><option>Loading…</option></select></label>
+        <p class="caption compare-summary" data-summary></p>
+      </div>
+      <div class="method-grid">
+        {methods.map(method => (
+          <figure data-method={method.key}>
+            <figcaption>{method.name}</figcaption>
+            <div class="image-stage compare-stage">
+              <img data-image alt={method.name+' front view'} width="420" height="420" />
+              {method.key === 'dna' && <span class="compare-scale" data-scale hidden>5 µm</span>}
+            </div>
+          </figure>
+        ))}
+      </div>
+      <div class="timeline compare-timeline">
+        <div class="actions">
+          <button class="control" data-play type="button" aria-pressed="false" disabled>Play</button>
+          <button class="control step-button" data-prev type="button" aria-label="Previous time point" disabled>‹</button>
+          <button class="control step-button" data-next type="button" aria-label="Next time point" disabled>›</button>
+        </div>
+        <input type="range" id="comparison-time" aria-label="Time point" min="0" max="0" value="0" disabled />
+        <output data-time for="comparison-time">—</output>
+      </div>
+    </div>
+    <p class="scientific-note">The four panels show the same front view and time point. Colors distinguish instances within each method.</p>
+    <p class="status" role="status" data-status>Loading matched sequences…</p>
+  </section>
+</Base>
+
+<script>
+  type Method = 'dna' | 'pose' | 'chimp' | 'cpsam';
+  interface Frame {t:number}
+  interface Sequence {key:string; group:string; source:string; xySize:number; spacingXY:number | null; reference:number; frames:Frame[]}
+
+  const root = document.querySelector<HTMLElement>('#live-comparison')!;
+  const assets = root.dataset.assets!;
+  const collection = root.querySelector<HTMLSelectElement>('[data-collection]')!;
+  const chooser = root.querySelector<HTMLSelectElement>('[data-case]')!;
+  const play = root.querySelector<HTMLButtonElement>('[data-play]')!;
+  const prev = root.querySelector<HTMLButtonElement>('[data-prev]')!;
+  const next = root.querySelector<HTMLButtonElement>('[data-next]')!;
+  const slider = root.querySelector<HTMLInputElement>('#comparison-time')!;
+  const time = root.querySelector<HTMLOutputElement>('[data-time]')!;
+  const scale = root.querySelector<HTMLElement>('[data-scale]')!;
+  const status = root.querySelector<HTMLElement>('[data-status]')!;
+  const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+  const panels = [...root.querySelectorAll<HTMLElement>('[data-method]')].map(panel => ({
+    method: panel.dataset.method as Method,
+    image: panel.querySelector<HTMLImageElement>('img')!,
+  }));
+  const params = new URL(location.href).searchParams;
+  const cachedImages = new Map<string, Promise<void>>();
+  let sequences: Sequence[] = [];
+  let sequence: Sequence;
+  let requested = 0;
+  let pending = false;
+  let requestId = 0;
+  let timer: number | undefined;
+
+  function load(src: string) {
+    let cached = cachedImages.get(src);
+    if (!cached) {
+      const image = new Image();
+      image.src = src;
+      cached = image.decode().catch(error => {
+        cachedImages.delete(src);
+        throw error;
+      });
+      cachedImages.set(src, cached);
+      if (cachedImages.size > 96) cachedImages.delete(cachedImages.keys().next().value!);
+    }
+    return cached;
+  }
+
+  function panelSources(sample: Sequence, frame: Frame) {
+    return panels.map(({method}) => assets+sample.key+'/'+frame.t+'-'+method+'.webp');
+  }
+
+  async function show(index: number) {
+    const chosen = sequence;
+    requested = Math.max(0, Math.min(index, chosen.frames.length - 1));
+    const frame = chosen.frames[requested];
+    const sources = panelSources(chosen, frame);
+    const id = ++requestId;
+    pending = true;
+    slider.value = String(requested);
+    prev.disabled = requested === 0;
+    next.disabled = requested === chosen.frames.length - 1;
+    try {
+      await Promise.all(sources.map(load));
+      if (id !== requestId) return;
+      panels.forEach(({image}, i) => { image.src = sources[i]; });
+      scale.hidden = !chosen.spacingXY;
+      if (chosen.spacingXY) scale.style.width = 500 / (chosen.xySize * chosen.spacingXY) + '%';
+      time.value = 't = ' + frame.t;
+      status.textContent = '';
+      const address = new URL(location.href);
+      address.searchParams.set('case', chosen.key);
+      address.searchParams.set('t', String(frame.t));
+      history.replaceState(null, '', address);
+      const upcoming = chosen.frames[requested + 1];
+      if (upcoming) panelSources(chosen, upcoming).forEach(src => { void load(src).catch(() => {}); });
+    } catch {
+      if (id === requestId) status.textContent = 'Could not load this time point. Choose another frame to retry.';
+    } finally {
+      if (id === requestId) pending = false;
+    }
+  }
+
+  function pause() {
+    window.clearInterval(timer);
+    timer = undefined;
+    play.textContent = 'Play';
+    play.setAttribute('aria-pressed', 'false');
+  }
+
+  function select(sample: Sequence, t: number) {
+    pause();
+    sequence = sample;
+    chooser.value = sample.key;
+    slider.max = String(sample.frames.length - 1);
+    slider.disabled = sample.frames.length < 2;
+    play.disabled = slider.disabled;
+    summary.textContent = sample.frames.length+' frames · '+sequences.length+' sequences available';
+    status.textContent = 'Loading sequence…';
+    const index = sample.frames.findIndex(frame => frame.t === t);
+    void show(index < 0 ? 0 : index);
+  }
+
+  function list() {
+    const entries = sequences.filter(sample => collection.value === 'all' || collection.value === sample.group);
+    chooser.replaceChildren(...entries.map(sample => new Option(sample.source, sample.key)));
+    return entries;
+  }
+
+  collection.addEventListener('change', () => {
+    const available = list();
+    const current = available.find(sample => sample.key === sequence.key);
+    if (current) chooser.value = current.key;
+    else select(available[0], available[0].reference);
+  });
+  chooser.addEventListener('change', () => {
+    const sample = sequences.find(row => row.key === chooser.value)!;
+    select(sample, sample.reference);
+  });
+  play.addEventListener('click', () => {
+    if (timer !== undefined) {
+      pause();
+      return;
+    }
+    play.textContent = 'Pause';
+    play.setAttribute('aria-pressed', 'true');
+    timer = window.setInterval(() => {
+      if (!pending) void show((requested + 1) % sequence.frames.length);
+    }, 250);
+  });
+  slider.addEventListener('input', () => { pause(); void show(Number(slider.value)); });
+  prev.addEventListener('click', () => { pause(); void show(requested - 1); });
+  next.addEventListener('click', () => { pause(); void show(requested + 1); });
+
+  fetch(assets+'index.json').then(response => {
+    if (!response.ok) throw new Error('Comparison index missing');
+    return response.json();
+  }).then((rows: Sequence[]) => {
+    sequences = rows;
+    const options = list();
+    const initial = options.find(sample => sample.key === params.get('case'))
+      ?? options.find(sample => sample.key === 'fig5') ?? options[0];
+    collection.disabled = false;
+    chooser.disabled = false;
+    select(initial, Number(params.get('t') ?? initial.reference));
+  }).catch(() => {
+    status.textContent = 'Could not load the matched sequences.';
+  });
+</script>

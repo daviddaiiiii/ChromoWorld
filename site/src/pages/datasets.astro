@@ -1,0 +1,38 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const repo = 'https://github.com/daviddaiiiii/ChromoWorld/blob/main/';
+const datasets = [
+  {kind:'2D', stage:'Fixed', title:'G-banding and FISH', count:'13,680 image–annotation pairs', text:'Fixed-cell images with chromosome-instance polygons. The atlas shows selected examples spanning all 24 classes.', asset:'fish-preview.webp', explore:'/virtual-fish/#class-atlas', download:'https://drive.google.com/file/d/1uiI7PR-H7DH77jsTPzEdkelMbMvmqB6x/view', size:'3.61 GB'},
+  {kind:'3D', stage:'Live', title:'Paired DNA and Tag volumes', count:'1,333 matched volume pairs', text:'Volumetric DNA and Tag images paired by sample name.', asset:'live/chr18/0-dna-tag.webp', explore:'/methods/#chromopose', download:'https://drive.google.com/file/d/1EoJxi3dP494kBQNJnXOkgXqhCznqACgo/view',size:'37.56 GB'},
+  {kind:'4D', stage:'Live', title:'Mitosis time series', count:'55 samples in the release bundle', text:'Time-lapse DNA images with predicted 3D masks and instance tracks. Three segmentation methods are available on 40 shared sequences.', asset:'live-preview.webp', explore:'/live-4d/compare/', download:'https://drive.google.com/file/d/1183tSn6ZAoZal6WO3oM08LSb6Q3TvG3o/view',size:'12.17 GB'}
+];
+---
+<Base title="Data">
+  <section class="shell page-head">
+    <p class="eyebrow">ChromoWorld Dataset</p><h1>Data across states.</h1>
+    <p class="lead">Explore examples and find the research downloads.</p>
+  </section>
+  <section class="shell" aria-label="Dataset catalog">
+    <div class="controls" id="data-filters" aria-label="Filter by dimension">
+      {['All','2D','3D','4D'].map((k,i)=><button type="button" class="control" data-filter={k} aria-pressed={i===0?'true':'false'}>{k}</button>)}
+    </div>
+    <div class="catalog">
+      {datasets.map(d=><article data-dimension={d.kind}>
+        <img src={base+'/assets/'+d.asset} alt={d.title+' preview'} loading="lazy"/>
+        <p class="eyebrow">{d.kind} · {d.stage}</p><h3>{d.title}</h3><p><strong>{d.count}</strong></p><p>{d.text}</p>
+        <div class="actions"><a class="button" href={base+d.explore}>Explore</a><a class="button" href={d.download}>Archive · {d.size}</a></div>
+      </article>)}
+    </div>
+    <p class="scientific-note">Counts describe the downloadable release. Google Drive archives may require access. <a href={repo+'Dataset/README.md'}>File formats, versions and checksums</a></p>
+  </section>
+</Base>
+<script>
+  const filters=[...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+  for(const el of filters)el.addEventListener('click',()=>{
+    filters.forEach(btn=>btn.setAttribute('aria-pressed',String(btn===el)));
+    document.querySelectorAll<HTMLElement>('[data-dimension]').forEach(card=>{
+      card.hidden=el.dataset.filter!=='All' && el.dataset.filter!==card.dataset.dimension;
+    });
+  });
+</script>
