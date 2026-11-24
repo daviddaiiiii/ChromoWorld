@@ -1148,10 +1148,48 @@ def pix_perturbations(t):
         label(im,x,508,title,p,WHITE,26)
     p=ramp(t,2.5,3.45)
     text(im,(495,550),"Small change",22,tone("#c9b6fa",p),True,"ma")
-    q=ramp(t,5.35,6.3)
-    line(im,(694,546),(1159,546),tone(HIRULE,q),2)
-    text(im,(926,557),"Performance falls with severity",22,tone(MUTED,q),anchor="ma")
-    caption(im,"Rotation and flipping had little effect. Stronger crowding and blur reduced performance.")
+    caption(im,"Rotation and flipping had little effect.")
+    return im
+
+
+@lru_cache(maxsize=1)
+def pix_perturbation_charts():
+    im=shot("ChromoPix / Fig. 3C · held-out test set", "Performance declines as the task gets harder")
+    values=json.loads((STORY/"pix-perturbation-bars.json").read_text())
+    panels=(
+        (74,"cp","Copy & Paste (CP)","Added chromosomes","crowd",
+         ("+25%","+50%","+75%","+100%"),"Near-linear decline"),
+        (660,"psf","Point Spread Function (PSF)","Blur kernel size","blur",
+         ("15 px","30 px","45 px","60 px"),"Larger drops with stronger blur"),
+    )
+    colors=("#e7eaf2","#8b94a5","#a3cbe6","#66abc9","#9d88df","#cf9ee5")
+    metrics=(("Precision","@0.5"),("F1",""),("Recall","@0.5"),
+             ("Dice",""),("mAP",""),("IoU",""))
+    draw=ImageDraw.Draw(im)
+    for x,name,title,detail,example,levels,takeaway in panels:
+        text(im,(x,158),title,28,WHITE,True)
+        text(im,(x,198),detail,20,MUTED)
+        plate(im,STORY/f"pix-perturb-{example}.webp",(x+501,188),(91,91))
+        for offset,color,level in zip((0,85,206,284,362,440),colors,("Original","Rotate + flip",*levels)):
+            draw.rectangle((x+offset,249,x+offset+10,259),fill=color)
+            text(im,(x+offset+15,243),level,16,MUTED)
+        left, right, top, base = x+45,x+546,293,516
+        for tick in (0,.2,.4,.6,.8):
+            y=round(mix(base,top,tick/.8))
+            text(im,(left-11,y),f"{tick:.1f}",17,MUTED,anchor="rm")
+            line(im,(left,y),(right,y),AXIS if tick==0 else HIRULE)
+        for j,(metric, qualifier) in enumerate(metrics):
+            center=left+(right-left)*(j+.5)/len(metrics)
+            for i,(scores,color) in enumerate(zip(values[name],colors)):
+                start=round(center-31+i*10.5)
+                y=round(mix(base,top,scores[j]/.8))
+                draw.rectangle((start,y,start+8,base-1),fill=color)
+            text(im,(center,529),metric,18,WHITE,True,"ma")
+            if qualifier:
+                text(im,(center,552),qualifier,16,MUTED,anchor="ma")
+        label(im,(left+right)/2,594,takeaway,1,"#d5c2ff",22)
+    line(im,(642,159),(642,617),HIRULE)
+    caption(im,"Scores decline predictably as copy-paste crowding or optical blur increases.")
     return im
 
 
@@ -1270,6 +1308,7 @@ SCENES = [
     (94,pix_cell_lines,True),
     (102,pix_scale,False),
     (110,pix_perturbations,False),
+    (114,lambda t: pix_perturbation_charts(),False),
     (120,pix_virtual_review,True),
     (129,pix_to_morphology,False),
     (134,lambda t: morphology(t*1.22),False),

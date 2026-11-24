@@ -68,12 +68,12 @@ scores stay in a similar range.
 Changing the field of view changes apparent scale.
 Performance holds up better under moderate rescaling.
 
-00:01:50.380 --> 00:01:54.508 line:92%,end size:91%
-Rotating or flipping the test images barely changes
-performance.
+00:01:50.380 --> 00:01:53.313 line:92%,end size:91%
+Rotation and flipping barely affect performance.
 
-00:01:55.440 --> 00:01:58.544 line:92%,end size:91%
-Increasing crowding or blur makes the task harder.
+00:01:54.200 --> 00:01:59.096 line:92%,end size:91%
+Crowding causes a near-linear decline. Stronger blur
+causes larger drops.
 
 00:02:00.440 --> 00:02:08.615 line:92%,end size:91%
 Here, FISH labeled this smaller instance as chromosome

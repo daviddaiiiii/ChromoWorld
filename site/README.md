@@ -49,6 +49,8 @@ learned 3D flow.
 The robustness chapter uses the held-out cell-line, scale, perturbation and
 virtual FISH panels in Fig. 3A–D. The transition into the shape map follows
 the same FISH-supported Chr1 instance from the virtual FISH field.
+The CP and PSF bar values come from the original Fig. 3C chart SVGs, supplied
+with `--fig3-chart-archive`. The film plots both charts on the same scale.
 The ChromoID comparison uses the original point-cloud objects in Fig. 5A/B/E
 and the matching vector centroid markers in Fig. 5C/E. The film connects
 the markers in the paper's chromosome order. To regenerate those assets,

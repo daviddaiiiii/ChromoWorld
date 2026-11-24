@@ -125,6 +125,26 @@ def fig3_panels(figure, dest):
         save(crop((x,665,x+235,901)),dest,f"pix-perturb-{name}")
 
 
+def fig3_perturbation_bars(archive, dest):
+    # Read the original Matplotlib bar heights and calibrate them with the SVG y ticks.
+    def coordinates(path):
+        return np.array(re.findall(r"[-+]?\d+(?:\.\d+)?",path),dtype=float).reshape(-1,2)
+
+    values = {}
+    for name in ("cp","psf"):
+        root = ET.parse(archive/f"fig3-d_{name}_bar.svg").getroot()
+        nodes = {node.get("id"):node for node in root.iter() if node.get("id")}
+        zero, tenth = (coordinates(nodes[f"ytick_{i}"][0][0].get("d"))[0,1] for i in (1,2))
+        scores = []
+        for index in range(3,39):
+            y = coordinates(nodes[f"patch_{index}"][0].get("d"))[:,1]
+            if not np.isclose(y.max(),zero):
+                raise ValueError(f"Unexpected baseline for Fig. 3C {name}, patch {index}")
+            scores.append((zero-y.min())/(zero-tenth)*.1)
+        values[name] = np.array(scores).reshape(6,6).round(6).tolist()
+    (dest/"pix-perturbation-bars.json").write_text(json.dumps(values,indent=2)+"\n")
+
+
 def fig5_identity_panels(rasters, vectors, dest):
     # Original A/B/E RGB objects and soft masks extracted with pdfimages.
     # Fig. 5C repeats the A/B point layout with a neutral background.
@@ -178,6 +198,8 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--fig3-figure", type=Path, required=True,
                         help="Raster export of the full Fig. 3 plate")
+    parser.add_argument("--fig3-chart-archive", type=Path, required=True,
+                        help="Folder containing the original Fig. 3C CP and PSF bar-chart SVGs")
     parser.add_argument("--fig5-map-rasters", type=Path, required=True,
                         help="Output directory of pdfimages -png with prefix fig5")
     parser.add_argument("--fig5-vectors", type=Path, required=True,
@@ -189,6 +211,7 @@ def main():
     karyotype(args.dataset,"Banding_05535",args.output)
     fig2_panels(args.fig2_figure,args.output)
     fig3_panels(args.fig3_figure,args.output)
+    fig3_perturbation_bars(args.fig3_chart_archive,args.output)
     fig5_panels(args.fig5,args.output)
     fig5_identity_panels(args.fig5_map_rasters,args.fig5_vectors,args.output)
     pose_panels(args.pose_figure,args.output)
