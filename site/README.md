@@ -37,7 +37,10 @@ in `scripts/prepare_assets.py`.
 
 The opening karyotype is arranged from a single held-out, reference-annotated
 G-banding field. `scripts/prepare_intro_story.py` extracts it and the Fig. 2/5
-comparison panels from the original local datasets and figure exports. Pass
+comparison panels from the original local datasets and figure exports. The
+fixed-cell chapter shows the Fig. 2A preparation schematics, the Fig. 2B
+metrics and the top row of Fig. 2D, where all three models train on G-banding
+only and predict on the same held-out FISH image. Pass
 `--pose-figure` the raster export of Supplementary Fig. S2 to extract the
 same-frame comparison of FAST-CHIMP (EmbedSeg), Cellpose-SAM and ChromoPose.
 The comparison is qualitative. The subsequent diagram explains the distance-

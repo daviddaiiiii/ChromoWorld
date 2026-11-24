@@ -311,23 +311,19 @@ def embeddings():
     fish_cloud.example()
     return combined, banding, fish_cloud
 
-def banding(t):
-    im = shot("Fixed cells / G-banding","A barcode for each chromosome")
-    p = camera(t,1.1,3.8)
-    x = mix(640,305,p)
-    w = round(mix(478,425,p))
-    paste(im,picture(SOURCE/"banding-dna.webp",w),(x,376))
-    for i,(chr_number,u,v,dest) in enumerate(((1,.634,.356,741),(2,.919,.483,1033))):
-        q = ramp(t,2+i*.6,3.55+i*.6)
-        if not q:
-            continue
-        color = PALETTE[chr_number-1]
-        fx,fy = x+(u-.5)*w,376+(v-.5)*w
-        dot(ImageDraw.Draw(im),fx,fy,round(.079*w),None,tone(color,q),2)
-        plate(im,SOURCE/f"banded-chr{chr_number}.webp",(dest,382),(244,294),q)
-        label(im,dest,576,f"Chr{chr_number}",q,color)
-    label(im,x,587,"G-banded metaphase",1.,MUTED,23)
-    caption(im,"Distinctive light and dark bands provide an identity cue.")
+def preparation_states(t):
+    im = shot("Fig. 2A / schematic", "What changes from G-banding to FISH?")
+    states = (
+        (335, "dehydrated", "G-banding", "Dehydrated · distinct stripes", 0.0),
+        (945, "rehydrated", "FISH", "Rehydrated · varied shapes without bands", 2.5),
+    )
+    for x, name, title, description, delay in states:
+        p = ramp(t, delay, delay+.85)
+        label(im, x, 176, title, p, WHITE, 30)
+        plate(im, STORY/f"state-{name}.webp", (x, 382), (372, 299), p)
+        text(im, (x, 553), description, 24, tone(MUTED,p), anchor="ma")
+    line(im, (640, 176), (640, 596), tone(HIRULE, ramp(t,2.5,3.35)))
+    caption(im, "Preparation changes the texture and shape cues available to the models.")
     return im
 
 
@@ -1062,25 +1058,24 @@ def architecture(t, emphasis=False):
 
 
 def cross_domain(t):
-    im = shot("Fig. 2B–D / held-out evaluation", "The same models face a different preparation")
-    if t < 5.6:
+    if t < 5.8:
+        im = shot("Fig. 2B / held-out evaluation", "The same models face a different preparation")
         plate(im,STORY/"banding-transfer-metrics.webp",(454,378),(736,422))
         text(im,(882,273),"One training state",29,WHITE,True)
-        text(im,(883,320),"G-banding",23,MUTED)
+        text(im,(883,320),"G-banding only",23,MUTED)
         text(im,(882,395),"Two test states",29,WHITE,True)
-        text(im,(883,440),"Banded and rehydrated",23,MUTED)
+        text(im,(883,440),"G-banding and FISH",23,MUTED)
         caption(im,"Fig. 2B. Each line follows a metric for the same trained model across two preparations.")
         return im
-    p = ramp(t, 5.75, 6.7)
-    q = ramp(t, 9.35, 10.35)
-    plate(im, STORY/"fish-held-out.webp", (329,369), (405,405))
-    first = fitted(STORY/"banding-only-v11.webp",405,405)
-    second = fitted(STORY/"banding-only-v12.webp",405,405)
-    paste(im, light(blend(first,second,q),p), (950,369))
-    line(im, (640,177),(640,553),HIRULE)
-    label(im, 329, 589, "FISH reference · Chr1")
-    label(im, 950, 589, ("YOLOv11-Seg" if q<.5 else "YOLOv12-Seg")+" · trained on Banding", p, WHITE, 24)
-    caption(im, "Banding-trained baselines score well in-domain and lose accuracy on rehydrated chromosomes.")
+    im = shot("Fig. 2D / G-banding-only training", "Three frameworks, one FISH field")
+    text(im, (77,153), "All trained on G-banding and evaluated on the same held-out FISH image.", 24, MUTED)
+    models = (("mask-rcnn", "Mask R-CNN", "No detections"),
+              ("v11", "YOLOv11-Seg", "Masks with incorrect IDs"),
+              ("v12", "YOLOv12-Seg", "Masks with incorrect IDs"))
+    for x, (name, title, detail) in zip((252,640,1028),models):
+        plate(im, STORY/f"banding-only-{name}.webp", (x,380), (354,354))
+        label(im, x, 570, title, size=27)
+        text(im, (x,605), detail, 21, tone(MUTED,ramp(t,7.2,8.25)), anchor="ma")
     return im
 
 
@@ -1182,8 +1177,8 @@ SCENES = [
     (0,karyotype_open,False),
     (12,living_question,False),
     (22,architecture,True),
-    (43,banding,True),
-    (51,cross_domain,False),
+    (43,preparation_states,True),
+    (51,cross_domain,True),
     (65,lambda t: virtual_fish(t*.92),True),
     (77,lambda t: invariant_learning(t*.95),False),
     (94,lambda t: morphology(t*1.22),True),

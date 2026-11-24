@@ -66,19 +66,31 @@ def white_to_black(image):
     return Image.fromarray(np.uint8(np.clip(mapped, 0, 1)*255))
 
 
-def benchmark_panels(fig2, fig2_figure, fig5, dest):
+def fig2_panels(fig2_figure, dest):
     with Image.open(fig2_figure) as image:
-        box = (188/891, 72/1260, 663/891, 338/1260)
-        panel = image.crop(tuple(round(a*b) for a,b in zip(box, image.size*2)))
-        ImageDraw.Draw(panel).rectangle((0,0,round(panel.width*.025),round(panel.height*.057)),fill="white")
+        image = image.convert("RGB")
+
+        def crop(bounds):
+            return image.crop(tuple(round(v*s/r) for v,s,r in zip(bounds,image.size*2,(1273,1800)*2)))
+
+        panel = crop((249,108,939,511))
+        ImageDraw.Draw(panel).rectangle((0,0,round(panel.width*.053),round(panel.height*.06)),fill="white")
         save(white_to_black(panel), dest, "banding-transfer-metrics")
-    fish = Path("id01_HFF_FISH_00023")
-    with Image.open(fig2/"fig2-c.png") as image:
-        save(white_to_black(image), dest, "fish-held-out")
-    for label, basename in (("v11", "YOLOv11-Seg"), ("v12", "YOLOv12-Seg")):
-        with Image.open(fig2 / f"{fish}_{basename}_banding.png") as image:
-            panel = image.crop((0, (image.height+1)//2, image.width//2, image.height))
-            save(white_to_black(panel), dest, f"banding-only-{label}")
+        # Fig. 2A artwork interiors. Fade the white paper matte at the edges
+        # while keeping the original pale-blue artwork and its lighter stripes.
+        for name, bounds in (("dehydrated", (39,99,226,266)),
+                             ("rehydrated", (48,296,232,470))):
+            panel = crop(bounds)
+            rgb = np.asarray(panel, dtype=np.int16)
+            alpha = np.clip((rgb[...,2] - rgb[...,0] - 1)*255./4, 0, 255)
+            panel = Image.composite(panel, Image.new("RGB", panel.size), Image.fromarray(alpha.astype(np.uint8)))
+            save(panel, dest, f"state-{name}")
+        # The upper row of Fig. 2D uses G-banding-trained weights for all models.
+        for name, left, right in (("mask-rcnn",343,640), ("v11",652,949), ("v12",961,1258)):
+            save(crop((left,550,right,854)), dest, f"banding-only-{name}")
+
+
+def fig5_panels(fig5, dest):
     for index,name in ((259,"mip-raw"),(264,"mip-naive"),(267,"mip-optimal")):
         with Image.open(fig5 / f"image{index}.png") as image:
             save(image.convert("RGB"),dest,name)
@@ -97,8 +109,7 @@ def pose_panels(figure, dest):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset", type=Path)
-    parser.add_argument("fig2", type=Path)
-    parser.add_argument("fig2_figure", type=Path)
+    parser.add_argument("fig2_figure", type=Path, help="Raster export of the full Fig. 2 plate")
     parser.add_argument("fig5", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--pose-figure", type=Path, required=True,
@@ -106,11 +117,13 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True)
     karyotype(args.dataset,"Banding_05535",args.output)
-    benchmark_panels(args.fig2,args.fig2_figure,args.fig5,args.output)
+    fig2_panels(args.fig2_figure,args.output)
+    fig5_panels(args.fig5,args.output)
     pose_panels(args.pose_figure,args.output)
     (args.output/"sources.json").write_text(json.dumps({
         "karyotype":"Dataset/2D held-out G-banding, Banding_05535; arranged by the reference annotations",
-        "banding_only":"Archival Fig. 2C/D reference and Banding-only baselines for id01_HFF_FISH_00023",
+        "preparation_states":"Fig. 2A dehydrated and rehydrated chromosome schematics",
+        "banding_only":"Fig. 2D top row: Mask R-CNN, YOLOv11-Seg and YOLOv12-Seg on the same held-out FISH field (id01_HFF_FISH_00023)",
         "projection":"Archival Fig. 5A/B image panels from the presentation",
         "identity_flow":"LiftedMIP_umap_embed.npz; same embedding coordinates, three sets of inferred identities",
         "pose_comparison":"Supplementary Fig. S2c; three predictions on the same live-cell frame"

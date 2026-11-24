@@ -29,18 +29,19 @@ three-dimensional reference atlas.
 ChromoPose separates live instances. Tracking links
 them. ChromoID matches their shapes.
 
-00:00:43.500 --> 00:00:50.685 line:92%,end size:91%
-G-banding gives models two reliable cues in fixed
-spreads: distinctive stripes and familiar shapes
-produced by preparation.
+00:00:43.500 --> 00:00:50.694 line:92%,end size:91%
+G-banding shows stripes on dehydrated chromosomes. In
+rehydrated FISH images, the stripes disappear and
+shapes become more varied.
 
-00:00:51.380 --> 00:00:58.000 line:92%,end size:91%
-The cues change with preparation. Banding-trained
-models lose accuracy on rehydrated chromosomes.
+00:00:51.380 --> 00:00:56.720 line:92%,end size:91%
+All three models train on G-banding alone. Each loses
+accuracy when tested on FISH.
 
-00:00:58.270 --> 00:01:03.593 line:92%,end size:91%
-Changing the architecture barely helps. Training
-rewarded cues tied to preparation.
+00:00:57.050 --> 00:01:04.709 line:92%,end size:91%
+In this FISH field, Mask R-CNN finds no instances. Both
+YOLO models draw masks, but assign incorrect chromosome
+identities.
 
 00:01:05.500 --> 00:01:11.600 line:92%,end size:91%
 FISH brings us closer. Rehydrated chromosomes lack
