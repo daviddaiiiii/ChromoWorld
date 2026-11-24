@@ -11,8 +11,8 @@ tracked through mitosis.
 
 | [Fixed-cell atlas](https://daviddaiiiii.github.io/ChromoWorld/virtual-fish/) | [Morphology maps](https://daviddaiiiii.github.io/ChromoWorld/identity-flow/) | [Live-cell movies](https://daviddaiiiii.github.io/ChromoWorld/live-4d/) |
 | --- | --- | --- |
-| [![G-banded and FISH chromosome spreads](site/public/assets/atlas-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/virtual-fish/) | [![Chromosome classes in two morphology maps](site/public/assets/shape-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/identity-flow/) | [![Live-cell DNA with tracked chromosome surfaces](site/public/assets/tracked-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/live-4d/) |
-| Compare annotations and predictions across 24 classes. | Locate the same class in G-banding and FISH. | Follow a division or compare three segmentations. |
+| [![G-banded and FISH chromosome spreads](site/public/assets/atlas-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/virtual-fish/) | [![UMAP and class centroids for G-banding, FISH and live cells](site/public/assets/shape-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/identity-flow/) | [![Live-cell DNA with tracked chromosome surfaces](site/public/assets/tracked-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/live-4d/) |
+| Compare annotations and predictions across 24 classes. | Compare class centroids in G-banding, FISH and live cells. | Follow a division or compare three segmentations. |
 
 ## Models
 

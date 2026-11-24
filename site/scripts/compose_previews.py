@@ -63,5 +63,6 @@ if __name__ == "__main__":
     pair(["live/chr18/3-candidates-tag.webp", "live/chr18/3-dna-tag.webp"], ["Tracked instances", "DNA + Tag"], "live-preview.webp")
     pair(["live/ordinary/mitosis/18-dna.webp", "live/ordinary/mitosis/18-mask.webp"], ["DNA projection", "3D instance surfaces"], "pose-preview.webp")
     tracked_preview()
-    morphology_pair("centroids.json", ["banding", "fish"], ["G-banding", "FISH"], "shape-preview.webp")
+    from prepare_state_maps import cover
+    cover(json.loads((ASSETS.parent.parent/"src/data/state-maps.json").read_text()), ASSETS/"state-maps")
     morphology_pair("live-centroids.json", ["naive", "lifted"], ["Projected morphology", "Lifted morphology"], "lift-preview.webp")

@@ -1433,6 +1433,14 @@ def main():
         image.save(poster,"WEBP",lossless=True)
         video=Path(staging)/"intro.mp4"
         write_video(video,(i/FPS for i in range(DURATION*FPS)),credits=args.credits,audio=args.audio_master)
+        if args.credits:
+            stream = Path(staging)/"intro-stream.webm"
+            subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),"-hide_banner","-loglevel","error","-y",
+                            "-i",str(video),"-map","0:v:0","-map","0:a:0","-vf","scale=960:624:flags=lanczos",
+                            "-c:v","libvpx-vp9","-row-mt","1","-tile-columns","1","-cpu-used","5","-threads","6",
+                            "-crf","33","-b:v","0","-g","72","-pix_fmt","yuv420p","-c:a","libopus","-b:a","72k",
+                            "-reserve_index_space","8192",str(stream)],check=True)
+            stream.replace(args.output_dir/stream.name)
         video.replace(args.output_dir/video.name)
         poster.replace(args.output_dir/poster.name)
 

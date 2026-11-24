@@ -199,6 +199,8 @@ dl{margin:0}dt{font-weight:670}dd{margin:0 0 .65rem;color:var(--muted)}
 .film{border:1px solid #38373e;border-radius:12px;background:#000}
 .film figcaption{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;background:#17171b;font-variant-numeric:tabular-nums}
 .film figcaption strong{color:var(--on-dark);font-weight:630}
+.film-formats{display:inline-flex;align-items:center;gap:14px}
+.film-formats a{color:inherit}
 .film-chapters{margin-top:8px;border-bottom:1px solid #38373e}
 .film-chapters summary{cursor:pointer;padding:10px 4px;font-weight:600;color:#f5f3f9}
 .film-chapters summary:focus-visible{outline:3px solid #af92ff;outline-offset:2px}

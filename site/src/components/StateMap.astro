@@ -1,0 +1,37 @@
+---
+import maps from '../data/state-maps.json';
+import palette from '../data/palette.json';
+type Key = keyof typeof maps;
+const { map, title, description } = Astro.props as {map:Key; title:string; description:string};
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const order = [...Array.from({length:12},(_,i)=>String(i+1)), 'X', ...Array.from({length:10},(_,i)=>String(i+13)), 'Y'];
+const centers:Record<string,number[]> = maps[map];
+const colors:Record<string,string> = palette;
+const points = order.map(c => {
+  const [x,y,n] = centers[c];
+  return {id:c, x:32+300*x, y:11+300*y, n, color:colors[c]};
+});
+---
+<figure class="state-map" data-map={map}>
+  <figcaption><h3>{title}</h3><p>{description}</p></figcaption>
+  <svg viewBox="0 0 360 345" role="group" aria-label={title+' UMAP and chromosome-class centroids'}>
+    <image class="state-cloud" href={base+'/assets/state-maps/'+map+'.webp'} x="32" y="11" width="300" height="300" />
+    <path d="M29 21V316H335" class="map-axes" />
+    <text x="333" y="335" text-anchor="end" class="axis-label">UMAP 1</text>
+    <text transform="translate(17 55) rotate(-90)" text-anchor="middle" class="axis-label">UMAP 2</text>
+    <g class="state-centers">
+      <polyline class="center-path" points={points.map(p=>p.x+','+p.y).join(' ')} />
+      {points.map(p=>
+        <g data-class={p.id} data-count={p.n} aria-label={'Chromosome '+p.id} class="map-marker">
+          <title>{'Chr'+p.id+(p.n?' · '+p.n.toLocaleString('en-US')+' instances':' · inferred identity')}</title>
+          <circle cx={p.x} cy={p.y} r="7" fill="transparent" />
+          <circle class="center-dot" cx={p.x} cy={p.y} r="3.8" fill={p.color} />
+        </g>
+      )}
+      <g class="chosen-marker" visibility="hidden" pointer-events="none">
+        <circle r="8" fill="none" stroke="white" stroke-width="1.8" />
+        <text x="12" y="-8" class="chosen-label"></text>
+      </g>
+    </g>
+  </svg>
+</figure>

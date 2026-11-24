@@ -38,7 +38,19 @@ TIFFs. The patient scale bars use calibrated OME-TIFF voxel dimensions.
 `src/data/live-feature.json` selects the initial Normal view and the paired
 homepage preview produced by `scripts/compose_previews.py`.
 
+## Identity across states
+
+Run `python scripts/prepare_state_maps.py ../Artifacts PATH_TO_FIGURE_EXPORTS`
+from the site directory to regenerate the UMAP clouds, normalized centroids and
+homepage preview. Fixed-cell maps use every saved Fig. 4 coordinate. The main
+live-cell map uses the Fig. 5E cloud and vector centroids exported by
+`prepare_intro_story.py`. Each panel preserves its original geometry.
+
 ## Homepage film
+
+The player first offers a 960 × 624 VP9/Opus WebM for streaming. The original
+1280 × 832 H.264/AAC MP4 is available through the same player and the HD link.
+Both use the same chapters and bilingual captions.
 
 The opening karyotype is arranged from a single held-out, reference-annotated
 G-banding field. `scripts/prepare_intro_story.py` extracts it and the Fig. 2/5

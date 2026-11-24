@@ -12,9 +12,9 @@ const explorers = [
     alt:'A DNA projection next to color-coded tracked chromosomes',
     description:'Follow a division frame by frame, or compare how three models separate the same chromosomes.',
     links:[['Explore tracks',`/live-4d/?sample=${feature.sample}&t=${feature.time}&view=front`],['Compare methods','/live-4d/compare/']] },
-  { category:'Morphology', title:'Identity across states', img:'shape-preview.webp',
-    alt:'Rainbow-colored morphology maps for G-banding and FISH',
-    description:'Find one chromosome class in two maps of shape, one from G-banding and one from FISH.',
+  { category:'Morphology', title:'Identity across states', img:'shape-preview.webp?v=2',
+    alt:'UMAP clouds and chromosome-class centroids in G-banding, FISH and live cells',
+    description:'Locate the same chromosome class in G-banding, FISH and live cells using UMAP and class centroids.',
     links:[['Explore the maps','/identity-flow/']] },
 ];
 const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[77,'ChromoPix'],[94,'Robustness'],[134,'Morphology & UMAP'],[163,'ChromoPhy'],[173,'ChromoPose'],[211,'ChromoLift'],[233,'ChromoID'],[269,'Patient Chr14'],[302,'Clinical follow-up']];
@@ -33,12 +33,15 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
       </div>
       <div class="hero-film">
         <figure class="film">
-          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=14')} src={asset('intro.mp4?v=14')} aria-label="A Karyotype in Motion">
+          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=14')} aria-label="A Karyotype in Motion">
+            <source src={asset('intro-stream.webm')} type='video/webm; codecs="vp9, opus"' />
+            <source src={asset('intro.mp4?v=14')} type="video/mp4" />
             <track kind="captions" srclang="en" label="English" src={asset('intro-en.vtt?v=13')} />
             <track kind="subtitles" srclang="zh-Hans" label="简体中文" src={asset('intro-zh.vtt?v=13')} />
           </video>
-          <figcaption><strong>A Karyotype in Motion</strong><span>5:38</span></figcaption>
+          <figcaption><strong>A Karyotype in Motion</strong><span class="film-formats"><a id="intro-hd" href={asset('intro.mp4?v=14')}>Open HD MP4</a><span>5:38</span></span></figcaption>
         </figure>
+        <p id="film-error" class="film-credit" role="status" hidden>Video unavailable here. <a href="https://github.com/daviddaiiiii/ChromoWorld/blob/main/site/public/assets/intro.mp4">Get the film on GitHub</a>.</p>
         <details class="film-chapters">
           <summary>Chapters <span id="current-chapter">{chapters[0][1]}</span></summary>
           <div class="chapter-row" aria-label="Jump to a video chapter">
@@ -81,6 +84,28 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
 <script>
   const film = document.querySelector<HTMLVideoElement>('#intro')!;
   const chapters = [...document.querySelectorAll<HTMLButtonElement>('[data-time]')];
+  const hd = document.querySelector<HTMLAnchorElement>('#intro-hd')!;
+  const filmError = document.querySelector<HTMLElement>('#film-error')!;
+  let playing = false;
+  film.addEventListener('play', () => { playing = true; });
+  film.addEventListener('loadeddata', () => { filmError.hidden = true; });
+  film.querySelector('source[type="video/mp4"]')!.addEventListener('error', () => { filmError.hidden = false; });
+  film.addEventListener('pause', () => { if (!film.error) playing = false; });
+  film.addEventListener('error', () => {
+    // The browser handles unsupported sources before playback. Recover if a
+    // selected WebM fails later, retaining the chapter and playback intent.
+    if (!film.currentSrc.endsWith('.webm') || film.getAttribute('src')) {
+      filmError.hidden = false;
+      return;
+    }
+    const time = film.currentTime, resume = playing;
+    film.addEventListener('loadedmetadata', () => {
+      film.currentTime = Math.min(time, film.duration);
+      if (resume) film.play().catch(() => {});
+    }, { once:true });
+    film.src = hd.href;
+    film.load();
+  });
   let active: HTMLButtonElement | undefined;
   function updateChapter() {
     const chapter = chapters.findLast(button => Number(button.dataset.time) <= film.currentTime);
