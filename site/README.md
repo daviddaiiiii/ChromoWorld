@@ -32,6 +32,11 @@ renders front and back views of the ordinary native tracked movies using
 `rounded_render.py`. A track ID maps to the same color across time and views.
 The tagged Chr3 and Chr18 views come from the separate reviewed-candidate export
 in `scripts/prepare_assets.py`.
+Use the same command with `--collection patients` and `public/assets/live/patients`
+as the output to render the patient tracking cohort from the matched release
+TIFFs. The patient scale bars use calibrated OME-TIFF voxel dimensions.
+`src/data/live-feature.json` selects the initial Normal view and the paired
+homepage preview produced by `scripts/compose_previews.py`.
 
 ## Homepage film
 

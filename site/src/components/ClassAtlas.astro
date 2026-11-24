@@ -2,12 +2,13 @@
 import palette from '../data/palette.json';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const classes = Object.entries(palette);
+const defaultClass = '1';
 const modes = [
   { key: 'banding', label: 'G-banding', note: 'Dehydrated chromosomes' },
   { key: 'fish', label: 'FISH', note: 'Rehydrated chromosomes' },
 ];
 ---
-<section class="shell atlas-section" id="class-atlas" data-assets={base + '/assets/atlas/'}>
+<section class="shell atlas-section" id="class-atlas" data-assets={base + '/assets/atlas/'} data-default-class={defaultClass}>
   <div class="atlas-bar">
     <div class="atlas-bar-title">
       <div><h2>Chromosome atlas</h2><p class="caption" id="atlas-summary">Loading reference instances…</p></div>
@@ -15,7 +16,7 @@ const modes = [
     </div>
     <div class="chromosome-picker" role="group" aria-label="Choose a chromosome class">
       {classes.map(([id, color]) => (
-        <button type="button" data-chromosome={id} aria-pressed={id === '14' ? 'true' : 'false'} aria-label={'Chromosome ' + id}>
+        <button type="button" data-chromosome={id} aria-pressed={id === defaultClass ? 'true' : 'false'} aria-label={'Chromosome ' + id}>
           <i style={'--chr:' + color} aria-hidden="true"></i>{id}
         </button>
       ))}
@@ -71,7 +72,7 @@ const modes = [
   const activeViews = new Map<HTMLElement, View>();
   const requestIds = new Map<HTMLElement, number>();
   const initial = new URL(location.href).searchParams.get('class') ?? '';
-  let chr = Object.hasOwn(colors, initial) ? initial : '14';
+  let chr = Object.hasOwn(colors, initial) ? initial : root.dataset.defaultClass!;
   let index: Index;
 
   function polygon(ctx: CanvasRenderingContext2D, points: number[], color: string, highlighted: boolean, reference = false) {

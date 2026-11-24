@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import feature from '../data/live-feature.json';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const asset = (name:string) => base + '/assets/' + name;
 const explorers = [
@@ -7,10 +8,10 @@ const explorers = [
     alt:'Annotated chromosome in G-banding and FISH microscopy',
     description:'Browse all 24 chromosome classes and compare reference annotations with ChromoPix predictions.',
     links:[['Open the atlas','/virtual-fish/#class-atlas']] },
-  { category:'Live 4D', title:'Mitosis explorer', img:'pose-preview.webp',
+  { category:'Live 4D', title:'Mitosis explorer', img:'tracked-preview.webp',
     alt:'A DNA projection next to color-coded tracked chromosomes',
     description:'Follow individual chromosomes through a division and compare three segmentation methods on synchronized frames.',
-    links:[['Explore tracks','/live-4d/'],['Compare methods','/live-4d/compare/']] },
+    links:[['Explore tracks',`/live-4d/?sample=${feature.sample}&t=${feature.time}&view=front`],['Compare methods','/live-4d/compare/']] },
   { category:'Morphology', title:'Identity across states', img:'shape-preview.webp',
     alt:'Rainbow-colored morphology maps for G-banding and FISH',
     description:'Compare the arrangement of chromosome classes in the G-banding and FISH morphology maps.',

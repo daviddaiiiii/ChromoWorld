@@ -22,9 +22,8 @@ const methods = [
       <div class="toolbar">
         <label>Collection <select class="control" data-collection disabled>
           <option value="all">All sequences</option>
-          <option value="others">Other live-cell sequences</option>
-          <option value="chr3">Chr3-tagged</option>
-          <option value="chr18">Chr18-tagged</option>
+          <option value="normal">Normal</option>
+          <option value="tagged">dCas9 Tag</option>
         </select></label>
         <label class="sample-select">Sample <select class="control" data-case disabled><option>Loading…</option></select></label>
         <p class="caption compare-summary" data-summary></p>
@@ -56,6 +55,8 @@ const methods = [
 </Base>
 
 <script>
+  import feature from '../../data/live-feature.json';
+
   type Method = 'dna' | 'pose' | 'chimp' | 'cpsam';
   interface Frame {t:number}
   interface Sequence {key:string; group:string; source:string; xySize:number; spacingXY:number | null; reference:number; frames:Frame[]}
@@ -156,7 +157,8 @@ const methods = [
   }
 
   function list() {
-    const entries = sequences.filter(sample => collection.value === 'all' || collection.value === sample.group);
+    const entries = sequences.filter(sample => collection.value === 'all' ||
+      collection.value === (sample.group === 'others' ? 'normal' : 'tagged'));
     chooser.replaceChildren(...entries.map(sample => new Option(sample.source, sample.key)));
     return entries;
   }
@@ -193,7 +195,7 @@ const methods = [
     sequences = rows;
     const options = list();
     const initial = options.find(sample => sample.key === params.get('case'))
-      ?? options.find(sample => sample.key === 'fig5') ?? options[0];
+      ?? options.find(sample => sample.key === feature.sample) ?? options[0];
     collection.disabled = false;
     chooser.disabled = false;
     select(initial, Number(params.get('t') ?? initial.reference));

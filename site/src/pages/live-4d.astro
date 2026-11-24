@@ -14,6 +14,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <section class="shell live-section" id="live-explorer" data-assets={base + '/assets/live/'}>
     <div class="viewer">
       <div class="toolbar">
+        <label>Collection <select id="live-collection" class="control" disabled>
+          <option value="patients">Patients</option>
+          <option value="tagged">dCas9 Tag</option>
+          <option value="normal" selected>Normal</option>
+        </select></label>
         <label class="sample-select">Sample <select id="live-sample" class="control" disabled><option>Loading…</option></select></label>
         <label>View <select id="live-face" class="control" disabled><option value="front">Front</option><option value="back">Back</option></select></label>
         <button id="live-key" class="control" type="button" disabled>Reference frame</button>
@@ -58,13 +63,18 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </style>
 
 <script>
-  interface Sample {
+  import feature from '../data/live-feature.json';
+
+  type Collection = 'patients' | 'tagged' | 'normal';
+  interface Entry {
     key:string; name:string; experiment?:string|null; spacing:number[]; xySize:number;
     reference:number; frames:{t:number}[];
   }
+  interface Sample extends Entry {collection:Collection; folder:string}
   function get<T extends Element>(id:string){return document.querySelector<T>('#'+id)!;}
   const root = get<HTMLElement>('live-explorer');
   const url = root.dataset.assets!;
+  const collectionMenu = get<HTMLSelectElement>('live-collection');
   const sampleMenu = get<HTMLSelectElement>('live-sample');
   const time = get<HTMLInputElement>('live-time');
   const face = get<HTMLSelectElement>('live-face');
@@ -77,7 +87,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const dna = get<HTMLImageElement>('live-dna');
   const status = get<HTMLElement>('live-status');
   const query = new URLSearchParams(location.search);
-  let samples: Sample[], sample: Sample;
+  let groups: Record<Collection, Sample[]>, sample: Sample;
   let tick: number | undefined;
   let generation = 0, pending = false;
 
@@ -95,8 +105,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     const tag = tagged && tags.checked ? '-tag' : '';
     const target = tagged && candidates.checked ? 'candidates' : 'mask';
     const facing = side === 'back' ? '-back' : '';
-    const folder = tagged ? chosen.key : 'ordinary/'+chosen.key;
-    const prefix = url+folder+'/'+frame.t+'-';
+    const prefix = url+chosen.folder+'/'+frame.t+'-';
     const maskPath = prefix+target+tag+facing+'.webp';
     const dnaPath = prefix+'dna'+tag+facing+'.webp';
     const id = ++generation;
@@ -134,9 +143,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     play.setAttribute('aria-pressed','false');
   }
 
-  function selectSample(initial=false) {
+  function selectSample(chosen:Sample, initial=false) {
     stop();
-    sample = samples.find(item => item.key === sampleMenu.value) ?? samples[0];
+    sample = chosen;
     sampleMenu.value = sample.key;
     time.max = String(sample.frames.length-1);
     const requested = initial && query.has('t') ? Number(query.get('t')) : sample.reference;
@@ -150,27 +159,38 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     void refresh();
   }
 
-  async function manifest(path: string): Promise<Sample[]> {
+  async function manifest(path: string): Promise<Entry[]> {
     const response = await fetch(url+path);
     if (!response.ok) throw new Error('Sample index unavailable');
     return response.json();
   }
 
-  Promise.all([manifest('ordinary/index.json'), manifest('index.json')]).then(([ordinary, entries]) => {
-    const tagged = entries.filter(entry => entry.experiment);
-    samples = [...ordinary,...tagged];
-    function group(label: string, members: Sample[]) {
-      const options = document.createElement('optgroup');
-      options.label = label;
-      options.append(...members.map(item => new Option(item.name,item.key)));
-      return options;
-    }
-    sampleMenu.replaceChildren(group('Color by instance',ordinary),group('Fluorescence-tagged targets',tagged));
-    sampleMenu.value = query.get('sample') ?? 'mitosis';
+  function fillSamples(collection:Collection) {
+    sampleMenu.replaceChildren(...groups[collection].map(item => new Option(item.name,item.key)));
+  }
+
+  Promise.all([manifest('ordinary/index.json'), manifest('index.json'), manifest('patients/index.json')]).then(([ordinary, entries, patients]) => {
+    groups = {
+      normal: ordinary.map(entry => ({...entry, collection:'normal', folder:'ordinary/'+entry.key})),
+      tagged: entries.filter(entry => entry.experiment).map(entry => ({...entry, collection:'tagged', folder:entry.key})),
+      patients: patients.map(entry => ({...entry, collection:'patients', folder:'patients/'+entry.key})),
+    };
+    const featured = groups.normal.find(item => item.key === feature.sample) ?? groups.normal[0];
+    const initial = Object.values(groups).flat().find(item => item.key === query.get('sample')) ?? featured;
+    collectionMenu.value = initial.collection;
+    fillSamples(initial.collection);
     face.value = query.get('view') === 'back' ? 'back' : 'front';
-    sampleMenu.disabled = face.disabled = reference.disabled = false;
-    selectSample(true);
-    sampleMenu.addEventListener('change',() => selectSample());
+    collectionMenu.disabled = sampleMenu.disabled = face.disabled = reference.disabled = false;
+    selectSample(initial,true);
+    collectionMenu.addEventListener('change',() => {
+      const collection = collectionMenu.value as Collection;
+      fillSamples(collection);
+      selectSample(collection === 'normal' ? featured : groups[collection][0]);
+    });
+    sampleMenu.addEventListener('change',() => {
+      const selected = groups[sample.collection].find(item => item.key === sampleMenu.value);
+      if (selected) selectSample(selected);
+    });
     time.addEventListener('input',() => { stop(); void refresh(); });
     [tags,candidates].forEach(el => el.addEventListener('change',() => void refresh()));
     face.addEventListener('change',() => void refresh());
