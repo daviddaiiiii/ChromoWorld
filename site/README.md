@@ -45,9 +45,9 @@ G-banding field. `scripts/prepare_intro_story.py` extracts it and the Fig. 2/5
 comparison panels from the original local datasets and figure exports. The
 fixed-cell chapter shows the Fig. 2A preparation schematics, the Fig. 2B
 metrics and the top row of Fig. 2D, where all three models train on G-banding
-only and predict on the same held-out FISH image. Pass
-`--pose-figure` the raster export of Supplementary Fig. S2 to extract the
-same-frame comparison of FAST-CHIMP (EmbedSeg), Cellpose-SAM and ChromoPose.
+only and predict on the same held-out FISH image. The same-frame comparison
+of FAST-CHIMP (EmbedSeg), Cellpose-SAM and ChromoPose is rendered from the
+three released native masks for the Fig. S2c example.
 The comparison is qualitative. The subsequent diagram explains the distance-
 guided move toward the skeleton and convergence-based grouping along the
 learned 3D flow.
@@ -68,20 +68,32 @@ and the saved Fig. 4 and Fig. 5 embeddings in the sibling
 `release/Artifacts` directory. The morphology example in `src/data/overview`
 records the FISH annotation index, probe-channel registration and matching
 global row in the archived UMAP. The comparison aligns class means from
-the separately fitted G-banding and FISH maps to the joint map. The film
-uses the saved Lifted2D embedding to visualize the 3D descriptor atlas.
+the separately fitted G-banding and FISH maps to the joint map. The lifted
+atlas uses the original Fig. 5D object and the instance count from Lifted2D.
 The tracking, ChromoLift and ChromoID shots share the Fig. 5f movie and
 tracked instance recorded in `src/data/overview/fig5-live/source.json`.
 
-`src/data/overview/patient-source.json` records the patient clip and
-its frame matches to the paper presentation. The displayed daughter
-counts are imaging-based inferences. The micromanipulation sequence is
-a schematic, followed by cropped experimental evidence from Fig. 6.
+`src/data/overview/patient-source.json` records the patient sequence and
+its frame matches to the paper presentation. The patient scene uses the
+native-grid context and reviewed candidate TIFFs. The displayed daughter
+counts are imaging-based inferences. The micromanipulation sequence uses
+original embedded presentation artwork. The blots use the embedded raster
+objects and the plots use original Fig. 6 artwork.
 The clinical follow-up uses the target-lesion measurements and clinical
 observations reported in the v15 manuscript Results. The clinical team
 selected treatment independently.
 For a short rendering of the main transitions, run
 `python scripts/make_intro.py --preview /tmp/chromoworld-transitions.mp4`.
+
+`scripts/prepare_intro_media.py --help` lists the local source paths for
+regenerating all film layers. The source folder starts with the specimen and
+registration metadata and the reference anchor mask from `src/data/overview`.
+Generate Fig. 2, 3 and 6 PNG plates with `pdftoppm -scale-to 4800 -png -singlefile`
+on the original figures, and extract `image259.png`, `image264.png` and
+`image267.png` directly from the presentation's `ppt/media` folder.
+The film layers use lossless storage. Presentation raster objects retain
+their native detail. `CHROMOWORLD_FILM_MEDIA` can point the renderer at a
+separate source folder for review.
 
 ### Voice, captions and music
 
@@ -95,6 +107,10 @@ Render `scripts/intro_credits.tsx` as the `ChromoWorldCredits` composition
 in Remotion. With Kokoro ONNX, SciPy and imageio-ffmpeg available, run
 `python scripts/mix_intro.py SILENT_MP4 CREDITS_MP4 SCORE_MP3 KOKORO_ONNX VOICES_BIN OUTPUT_DIR`.
 This writes the final MP4 and both subtitle tracks.
+
+With the existing mastered WAV, `make_intro.py --credits CREDITS_MP4
+--audio-master MASTER_WAV --output-dir OUTPUT_DIR` encodes directly from
+the composed frames at higher quality in one pass.
 
 Music is an excerpt of [“A Kind Of Hope” by Scott Buckley](https://www.scottbuckley.com.au/library/a-kind-of-hope/),
 licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

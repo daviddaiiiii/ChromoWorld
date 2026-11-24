@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 def save(image, directory, name):
-    image.save(directory / (name + ".webp"), "WEBP", quality=94)
+    image.save(directory / (name + ".webp"), "WEBP", lossless=True)
 
 
 def chromosome_cutout(image, points):
@@ -42,17 +42,17 @@ def karyotype(test, specimen, dest):
     if any(len(chromosomes[i]) != 2 for i in range(23)) or chromosomes[23]:
         raise ValueError("This demonstration expects a complete reference-annotated XX spread")
 
-    board = Image.new("RGB", (684, 430), "black")
+    board = Image.new("RGB", (1368, 860), "black")
     d = ImageDraw.Draw(board)
     font_path = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
-    font = ImageFont.truetype(str(font_path) if font_path.exists() else "DejaVuSans.ttf", 22)
-    scale = min(1.35, 106 / max(tile.height for pairs in chromosomes.values() for tile in pairs))
+    font = ImageFont.truetype(str(font_path) if font_path.exists() else "DejaVuSans.ttf", 44)
+    scale = min(2.7, 212 / max(tile.height for pairs in chromosomes.values() for tile in pairs))
     for i, pairs in enumerate(chromosomes.values()):
-        x, y = 44 + (i % 8) * 85, 9 + (i // 8) * 140
+        x, y = 88 + (i % 8) * 170, 18 + (i // 8) * 280
         for j, tile in enumerate(pairs):
             tile = tile.resize(tuple(max(1, round(v * scale)) for v in tile.size), Image.Resampling.LANCZOS)
-            board.paste(tile, (x + 35*j - 18 - tile.width//2, y + 54 - tile.height//2))
-        d.text((x, y + 116), str(i+1) if i<22 else "XY"[i-22], font=font, fill="#b4b4bd", anchor="mm")
+            board.paste(tile, (x + 70*j - 36 - tile.width//2, y + 108 - tile.height//2))
+        d.text((x, y + 232), str(i+1) if i<22 else "XY"[i-22], font=font, fill="#b4b4bd", anchor="mm")
     save(board, dest, "karyotype")
     for i, tile in enumerate(chromosomes[0]):
         save(tile, dest, f"karyotype-chr1-{i+1}")
@@ -95,7 +95,10 @@ def fig2_panels(fig2_figure, dest):
 def fig5_panels(fig5, dest):
     for index,name in ((259,"mip-raw"),(264,"mip-naive"),(267,"mip-optimal")):
         with Image.open(fig5 / f"image{index}.png") as image:
-            save(image.convert("RGB"),dest,name)
+            rgba = image.convert("RGBA")
+            base = Image.new("RGB",rgba.size)
+            base.paste(rgba,mask=rgba.getchannel("A"))
+            save(base,dest,name)
 
 
 def fig3_panels(figure, dest):
@@ -107,14 +110,14 @@ def fig3_panels(figure, dest):
 
     for name, x, y, label_width in (("hff",32,89,52), ("mcf",284,89,97),
                                     ("rpe",32,340,65), ("mrc",285,340,65)):
-        panel = crop((x,y,x+246,y+247))
-        sx, sy = panel.width/246, panel.height/247
+        panel = crop((x+1,y+2,x+245,y+246))
+        sx, sy = panel.width/244, panel.height/244
         draw = ImageDraw.Draw(panel)
         draw.rectangle((0,0,round(36*sx),round(44*sy)),fill="black")
         draw.rectangle((0,round(224*sy),round(label_width*sx),panel.height),fill="black")
         save(panel,dest,f"pix-line-{name}")
     for name, bounds in (
-        ("scale-small",(1018,95,1265,342)), ("scale-large",(1272,95,1519,342)),
+        ("scale-small",(1019,97,1264,341)), ("scale-large",(1273,97,1518,341)),
         ("scale-metrics",(1006,375,1556,607)),
         ("review-reference",(379,1208,726,1555)), ("review-prediction",(863,1206,1210,1553)),
         ("review-instance",(1242,1460,1318,1528)),

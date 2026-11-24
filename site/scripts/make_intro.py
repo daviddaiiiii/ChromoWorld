@@ -2,6 +2,7 @@
 from functools import lru_cache
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -12,14 +13,14 @@ from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageEnhance, ImageFil
 
 SITE = Path(__file__).resolve().parents[1]
 ASSETS = SITE / "public/assets"
-SOURCE = SITE / "src/data/overview"
+SOURCE = Path(os.environ.get("CHROMOWORLD_FILM_MEDIA", SITE / "src/data/overview"))
 FIG4 = SITE.parent / "release/Artifacts/fig4"
 W, H, FPS, DURATION = 1280, 720, 24, 333
 BLACK, WHITE, MUTED = "#000000", "#f8faff", "#c1c6d4"
 GRID, AXIS, HIRULE = "#151a20", "#626b77", "#262a32"
 FONT = Path("/System/Library/Fonts/Supplemental")
 CLASS_NAMES = [str(i) for i in range(1, 23)] + ["X", "Y"]
-PAPER_COLORS = json.loads((SOURCE.parent / "palette.json").read_text())
+PAPER_COLORS = json.loads((SITE / "src/data/palette.json").read_text())
 PALETTE = [ImageColor.getrgb(PAPER_COLORS[name]) for name in CLASS_NAMES]
 EXAMPLE = json.loads((SOURCE / "example.json").read_text())
 ACCENT = PALETTE[EXAMPLE["class_id"]]
@@ -170,19 +171,20 @@ def reveal_registered(before, after, p, feather=25):
 
 
 def live(case, t, layer, width):
-    return picture(ASSETS / f"live/{case}/{t}-{layer}.webp", width)
+    return picture(SOURCE / f"live/{case}/{t}-{layer}.webp", width)
 
 
 def fish(layer, width):
-    return picture(ASSETS / f"fish/hff-{layer}.webp", width)
+    return picture(SOURCE / f"fish-{layer}.webp", width)
 
 
 def field_layers():
     dna = picture(SOURCE / "example-dna.webp")
     mask = Image.open(SOURCE / "example-mask.png").convert("L")
     mask = mask.resize(dna.size, Image.Resampling.NEAREST)
-    rim = ImageChops.subtract(mask.filter(ImageFilter.MaxFilter(5)),
-                              mask.filter(ImageFilter.MinFilter(3)))
+    edge_radius = max(1,round(dna.width/384))
+    rim = ImageChops.subtract(mask.filter(ImageFilter.MaxFilter(1+2*edge_radius)),
+                              mask.filter(ImageFilter.MinFilter(1+edge_radius//2*2)))
     tinted = blend(dna, Image.new("RGB", dna.size, ACCENT), .30)
     selected = Image.composite(tinted, ImageEnhance.Brightness(dna).enhance(.36), mask)
     selected.paste(ACCENT, (0, 0, *dna.size), rim)
@@ -200,9 +202,9 @@ def field_view(im, zoom, isolation, center, width, highlight=1.):
     dna, marked, isolated, bbox = microscopy()
     left, top, right, bottom = bbox
     # Zoom and pan into the original mask in the same coordinate system.
-    side = mix(768, 172, zoom)
-    cx = mix(384, (left + right) / 2, zoom)
-    cy = mix(384, (top + bottom) / 2, zoom)
+    side = mix(dna.width, dna.width*172/768, zoom)
+    cx = mix(dna.width/2, (left + right) / 2, zoom)
+    cy = mix(dna.height/2, (top + bottom) / 2, zoom)
     crop = tuple(round(c) for c in (cx-side/2, cy-side/2, cx+side/2, cy+side/2))
     field = blend(blend(dna, marked, highlight), isolated, isolation)
     paste(im, field.crop(crop).resize((width, width), Image.Resampling.BICUBIC), center)
@@ -785,8 +787,10 @@ def patient_division(t):
     im=shot("Patient-derived tumor cells","An unequal split of chromosome 14")
     frame=min(9,int(t*1.13))
     p=ramp(t,.6,2.4)
-    crop=(43,45,363,375)
-    image=picture(SOURCE/f"patient-{frame}.webp").crop(crop)
+    source=picture(SOURCE/f"patient-{frame}.webp")
+    scale=source.width/420
+    crop=tuple(round(v*scale) for v in (43,45,363,375))
+    image=source.crop(crop)
     size=round(mix(421,471,camera(t,1.,6.5)))
     image=blend(image.convert("L").convert("RGB"),image,p)
     width=round(size*image.width/image.height)
@@ -796,7 +800,7 @@ def patient_division(t):
         green=PALETTE[13]
         for x,a,(u,v),count in ((191,311,(127,109),2),(1089,970,(271,210),4)):
             ink=tone(green,reveal)
-            end=(640-width/2+(u-crop[0])*width/image.width,382-size/2+(v-crop[1])*size/image.height)
+            end=(640-width/2+(u*scale-crop[0])*width/image.width,382-size/2+(v*scale-crop[1])*size/image.height)
             text(im,(x,305),str(count),75,ink,True,"ma")
             label(im,x,403,"Chr14 copies",reveal,WHITE,24)
             offset=-54 if count==2 else 54
@@ -858,7 +862,6 @@ def qpcr_chapter(t):
     im=shot("Clonal validation / genomic qPCR","Copy-number differences persist")
     p=camera(t,.15,1.)
     plate(im,SOURCE/"qpcr.webp",(mix(904,896,p),380),(486,435),p)
-    label(im,936,600,"Passage",p,MUTED,22)
     text(im,(107,276),"Chr14 dosage",44,WHITE,True)
     text(im,(110,351),"Measured at chr14q24.1",27,MUTED)
     text(im,(110,400),"Across serial passages",27,MUTED)
@@ -883,8 +886,8 @@ def assay_evidence(t):
     label(im,149,539,"Patient 2",p,MUTED,20)
     label(im,389,539,"Patient 1",p,MUTED,20)
     line(im,(640,184),(640,578),HIRULE)
-    plate(im,SOURCE/"response.webp",(942,386),(498,302),q)
-    label(im,961,539,"Drug concentration (log₁₀ mol/L)",q,MUTED,22)
+    plate(im,SOURCE/"response.webp",(942,371),(486,292),q)
+    label(im,961,530,"Drug concentration (log10 mol/L)",q,MUTED,19)
     plate(im,SOURCE/"response-legend.webp",(943,589),(495,56),q)
     caption(im,"Higher-copy clones showed stronger AKT signaling and greater sensitivity to capivasertib ex vivo.")
     return im
@@ -1353,14 +1356,23 @@ def render(t):
     raise ValueError(f"Negative video time {t}")
 
 
-def write_video(path, times, preview=False):
+def write_video(path, times, preview=False, credits=None, audio=None):
     ffmpeg=imageio_ffmpeg.get_ffmpeg_exe()
     frame_size=(640,360) if preview else (W,H)
     cmd=[ffmpeg,"-hide_banner","-loglevel","error","-y","-f","rawvideo",
          "-pixel_format","rgb24","-video_size",f"{frame_size[0]}x{frame_size[1]}",
-         "-framerate",str(FPS),"-i","pipe:0","-an","-c:v","libx264",
-         "-preset","fast","-threads","4","-crf","19","-pix_fmt","yuv420p",
-         "-movflags","+faststart",str(path)]
+         "-framerate",str(FPS),"-i","pipe:0"]
+    if credits:
+        cmd += ["-i",str(credits),"-i",str(audio),"-filter_complex",
+                "[0:v]setsar=1,format=yuv420p,setpts=PTS-STARTPTS[film];"
+                "[1:v]setsar=1,format=yuv420p,setpts=PTS-STARTPTS[credit];"
+                "[film][credit]concat=n=2:v=1:a=0,pad=iw:ih+112:0:0:black[v]",
+                "-map","[v]","-map","2:a","-t",str(DURATION+5),"-c:a","aac","-b:a","192k",
+                "-metadata","comment=Music: A Kind Of Hope by Scott Buckley (CC BY 4.0)."]
+    else:
+        cmd += ["-an"]
+    cmd += ["-c:v","libx264","-preset","medium" if credits else "fast","-threads","4",
+            "-crf","14" if credits else "19","-pix_fmt","yuv420p","-movflags","+faststart",str(path)]
     with subprocess.Popen(cmd,stdin=subprocess.PIPE) as proc:
         for i,t in enumerate(times):
             if i%(10*FPS)==0:
@@ -1379,7 +1391,11 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preview",type=Path,help="Render a short review of the revised transitions")
     parser.add_argument("--output-dir",type=Path,default=ASSETS,help="Destination for the silent movie and poster")
+    parser.add_argument("--credits",type=Path,help="Five-second, 1280×720 credits composition")
+    parser.add_argument("--audio-master",type=Path,help="Mastered narration and music WAV")
     args=parser.parse_args()
+    if bool(args.credits) != bool(args.audio_master):
+        parser.error("Pass both --credits and --audio-master for the final film.")
     if args.preview:
         ranges=((21.,43.),(93.,164.),(172.,211.),(221.,256.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
@@ -1388,9 +1404,14 @@ def main():
     args.output_dir.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(dir=args.output_dir) as staging:
         poster=Path(staging)/"intro-poster.webp"
-        render(38.).save(poster,"WEBP",quality=94)
+        image=render(38.)
+        if args.credits:
+            padded=Image.new("RGB",(W,H+112),BLACK)
+            padded.paste(image,(0,0))
+            image=padded
+        image.save(poster,"WEBP",lossless=True)
         video=Path(staging)/"intro.mp4"
-        write_video(video,(i/FPS for i in range(DURATION*FPS)))
+        write_video(video,(i/FPS for i in range(DURATION*FPS)),credits=args.credits,audio=args.audio_master)
         video.replace(args.output_dir/video.name)
         poster.replace(args.output_dir/poster.name)
 
