@@ -16,7 +16,7 @@ from scipy.signal import resample_poly
 
 FPS = 24
 RATE = 48_000
-DURATION = 293
+DURATION = 338
 VOICE = "af_heart"
 CUES = Path(__file__).with_name("intro_narration.json")
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
@@ -102,7 +102,7 @@ def music_bed(score, dialogue):
     occupied = ndimage.maximum_filter1d(active,size=35)
     duck = ndimage.gaussian_filter1d(occupied,sigma=7)
     fade = np.clip((DURATION-time)/3.4,0,1)*np.clip(time/.7,0,1)
-    lift = np.interp(time,[0.,1.1,65.,66.,257.,258.,280.,288.,289.,293.],[1.25,1.,1.,.93,1.,.84,.84,1.2,1.5,1.5])
+    lift = np.interp(time,[0.,1.1,65.,66.,302.,303.,325.,333.,334.,338.],[1.25,1.,1.,.93,1.,.84,.84,1.2,1.5,1.5])
     envelope = fade*lift*(1-.49*duck)
     # Keep the score in the background even at the orchestral swell.
     block_rms = np.sqrt(np.mean(music.reshape(-1,hop,2)**2,axis=(1,2)))

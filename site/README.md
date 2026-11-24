@@ -46,8 +46,14 @@ same-frame comparison of FAST-CHIMP (EmbedSeg), Cellpose-SAM and ChromoPose.
 The comparison is qualitative. The subsequent diagram explains the distance-
 guided move toward the skeleton and convergence-based grouping along the
 learned 3D flow.
-The three live-cell comparison plots reuse a single saved UMAP coordinate
-set and apply each method’s archived class assignments.
+The robustness chapter uses the held-out cell-line, scale, perturbation and
+virtual FISH panels in Fig. 3A–D. The transition into the shape map follows
+the same FISH-supported Chr1 instance from the virtual FISH field.
+The ChromoID comparison uses the original point-cloud objects in Fig. 5A/B/E
+and the matching vector centroid markers in Fig. 5C/E. The film connects
+the markers in the paper's chromosome order. To regenerate those assets,
+extract the original raster layers with `pdfimages -png FIG5 FIG5_RASTERS/fig5`
+and the vector markers with `pdftocairo -svg FIG5 FIG5.svg`.
 
 Run `python scripts/make_intro.py` with Pillow, NumPy and imageio-ffmpeg
 installed. This writes the video and poster using the microscopy exports

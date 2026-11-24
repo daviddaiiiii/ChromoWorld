@@ -14,7 +14,7 @@ SITE = Path(__file__).resolve().parents[1]
 ASSETS = SITE / "public/assets"
 SOURCE = SITE / "src/data/overview"
 FIG4 = SITE.parent / "release/Artifacts/fig4"
-W, H, FPS, DURATION = 1280, 720, 24, 288
+W, H, FPS, DURATION = 1280, 720, 24, 333
 BLACK, WHITE, MUTED = "#000000", "#f8faff", "#c1c6d4"
 GRID, AXIS, HIRULE = "#151a20", "#626b77", "#262a32"
 FONT = Path("/System/Library/Fonts/Supplemental")
@@ -742,35 +742,27 @@ def lift_training(t):
 def lifted_atlas():
     file=FIG4.parent/"fig5/Lifted2D_umap_embed.npz"
     with np.load(file,allow_pickle=False) as arrays:
-        xy=arrays["lifted_combined_embedding"]
-        labels=arrays["lifted_combined_y"]
-    pr=Projection((0,0,668,401),[xy.min(0)-.5,xy.max(0)+.5])
-    return raster_cloud(xy,labels,pr),len(xy)
+        count=len(arrays["lifted_combined_y"])
+    return fitted(STORY/"identity-atlas.webp",592,387),count
 
 
 def atlas_and_match(t):
-    moving=camera(t,.38,2.56)
-    query=ramp(t,5.1,6.3)
-    if t < 5.7:
-        im=shot("ChromoLift / reference atlas","Lift the fixed-cell reference")
-    else:
-        im=shot("ChromoID / identity retrieval","Match live shape to the atlas")
+    im=shot("ChromoID / identity retrieval","Match live shape to the lifted atlas")
+    moving=camera(t,.4,2.9)
     cloud,count=lifted_atlas()
-    if query<1:
-        field_view(im,1,1,(mix(640,296,moving),381),round(mix(460,344,moving)),1)
-    if query:
-        paste(im,light(isolated_views(398,270)[0],query),(296,381))
-    if moving:
-        chart_x=round(mix(602,558,moving))
-        blank=Image.new("RGB",cloud.size)
-        paste_cloud(im,reveal_registered(blank,cloud,moving,85),(chart_x,166))
-        line(im,(555,175),(555,574),tone(HIRULE,moving))
-        label(im,892,564,f"{count:,} reference instances",moving,WHITE,26)
-        label(im,892,598,"UMAP of lifted 3D shape descriptors",moving,MUTED,21)
-    label(im,296,577,"Live 3D query" if query>.5 else "Known fixed-cell identities",
-          moving,"#c0ddfa" if query>.5 else WHITE,25)
-    caption(im,"Match on multiple 3D features, including volume, elongation and sphericity."
-            if t>=5.7 else "ChromoLift maps identity-annotated 2D shapes into a shared 3D descriptor space.")
+    paste(im,isolated_views(280,185)[0],(mix(366,296,moving),302))
+    label(im,296,412,"Measured live 3D shape",moving,"#c0ddfa",26)
+    paste(im,reveal_registered(Image.new("RGB",cloud.size),cloud,moving,85),(892,359))
+    line(im,(555,175),(555,610),tone(HIRULE,moving))
+    label(im,892,563,f"{count:,} lifted reference instances",moving,WHITE,25)
+    label(im,892,599,"UMAP of the reference atlas",moving,MUTED,21)
+    for i,(name,delay) in enumerate((("Compare with class prototypes",1.35),
+                                      ("Assign slots within the cell",5.9))):
+        p=ramp(t,delay,delay+.7)
+        y=500+i*52
+        text(im,(86,y),str(i+1),22,tone("#c9b6fa",p),True)
+        text(im,(125,y),name,24,tone(WHITE,p),True)
+    caption(im,"ChromoID computes both steps from physical descriptors such as volume, elongation and sphericity.")
     return im
 
 
@@ -1117,6 +1109,82 @@ def invariant_learning(t):
     return im
 
 
+def pix_cell_lines(t):
+    im=shot("ChromoPix / Fig. 3A", "Chromosome identity across four cell lines")
+    lines=(("hff","HFF","0.670"),("mcf","MCF-10F","0.700"),
+           ("rpe","RPE1","0.716"),("mrc","MRC-5","0.661"))
+    for i,(name,title,f1) in enumerate(lines):
+        x=207+288*i
+        p=ramp(t,.15+.38*i,.8+.38*i)
+        plate(im,STORY/f"pix-line-{name}.webp",(x,360),(252,252),p)
+        label(im,x,508,title,p,WHITE,27)
+        text(im,(x,549),f"F1  {f1}",22,tone(MUTED,p),anchor="ma")
+    caption(im,"Held-out F1 ranged from 0.661 to 0.716 across the four tested cell lines.")
+    return im
+
+
+def pix_scale(t):
+    im=shot("ChromoPix / Fig. 3B", "How much does image scale matter?")
+    for x,name,title in ((200,"small","Small field of view"),(485,"large","Large field of view")):
+        plate(im,STORY/f"pix-scale-{name}.webp",(x,355),(250,250))
+        label(im,x,505,title,size=24)
+    p=ramp(t,1.3,2.3)
+    plate(im,STORY/"pix-scale-metrics.webp",(926,351),(530,285),p)
+    line(im,(635,181),(635,573),tone(HIRULE,p))
+    label(im,926,490,"0.75× to 1.25×",p,"#c9b6fa",30)
+    text(im,(926,530),"Moderate rescaling",22,tone(MUTED,p),anchor="ma")
+    caption(im,"Moderate changes preserve performance better than the most extreme scales tested.")
+    return im
+
+
+def pix_perturbations(t):
+    im=shot("ChromoPix / Fig. 3C", "Test the limits of ChromoPix")
+    variants=(("original","Original"),("rotate","Rotate + flip"),
+              ("crowd","Crowding"),("blur","Optical blur"))
+    for i,(name,title) in enumerate(variants):
+        x=207+288*i
+        p=ramp(t,.15+.38*i,.8+.38*i)
+        plate(im,STORY/f"pix-perturb-{name}.webp",(x,360),(252,252),p)
+        label(im,x,508,title,p,WHITE,26)
+    p=ramp(t,2.5,3.45)
+    text(im,(495,550),"Small change",22,tone("#c9b6fa",p),True,"ma")
+    q=ramp(t,5.35,6.3)
+    line(im,(694,546),(1159,546),tone(HIRULE,q),2)
+    text(im,(926,557),"Performance falls with severity",22,tone(MUTED,q),anchor="ma")
+    caption(im,"Rotation and flipping had little effect. Stronger crowding and blur reduced performance.")
+    return im
+
+
+def pix_virtual_review(t):
+    im=shot("ChromoPix / Fig. 3D", "Virtual FISH flags a discordant instance")
+    p=ramp(t,1.45,2.55)
+    plate(im,STORY/"pix-review-reference.webp",(259,379),(343,343))
+    plate(im,STORY/"pix-review-prediction.webp",(643,379),(343,343),p)
+    label(im,259,568,"FISH annotation",size=24)
+    label(im,643,568,"ChromoPix prediction",p,WHITE,24)
+    q=ramp(t,3.1,4.1)
+    if q:
+        dot(ImageDraw.Draw(im),366,404,17,None,tone(PALETTE[0],q),2)
+        dot(ImageDraw.Draw(im),747,404,17,None,tone(PALETTE[16],q),2)
+    plate(im,STORY/"pix-review-instance.webp",(1019,343),(149,144),q)
+    text(im,(1019,442),"FISH annotation  Chr1",23,tone(MUTED,q),anchor="ma")
+    text(im,(1019,486),"ChromoPix  Chr17",25,tone(PALETTE[16],q),True,"ma")
+    caption(im,"A morphology-based discrepancy calls for review of the assignment.")
+    return im
+
+
+def pix_to_morphology(t):
+    im=shot("ChromoPix / morphology", "Follow one chromosome into the shape map")
+    p=camera(t,.25,1.65)
+    reference=Image.new("RGB",(W,H),BLACK)
+    field_view(reference,0.,0.,(640,382),452,ramp(t,1.35,3.05))
+    plate(im,STORY/"pix-review-prediction.webp",(640,382),(452,452))
+    if p:
+        im.paste(blend(im.crop((414,156,866,608)),reference.crop((414,156,866,608)),p),(414,156))
+    caption(im,"The labeled mask provides a boundary for measuring shape.")
+    return im
+
+
 def projection_failure(t):
     im = shot("Fig. 5A–B / cross-dimensional test", "Flattening the cell can collapse identities")
     for i, (filename, name) in enumerate((("mip-raw","Live DNA projection"),
@@ -1131,23 +1199,41 @@ def projection_failure(t):
 
 
 @lru_cache(maxsize=1)
-def retrieval_comparison_clouds():
-    with np.load(FIG4.parent/"fig5/LiftedMIP_umap_embed.npz", allow_pickle=False) as data:
-        xy = data["lifted_opt_mip_embedding"]
-        ys = [data[k] for k in ("lifted_opt_mip_y_mip","lifted_opt_mip_y_canvas","lifted_opt_mip_y")]
-    project = Projection((0,0,339,310),[xy.min(0)-.4,xy.max(0)+.4])
-    return [raster_cloud(xy,y,project) for y in ys]
+def paper_centroids():
+    return json.loads((STORY/"identity-centers.json").read_text())
 
 
 def retrieval_comparison(t):
-    im = shot("Fig. 5 / comparable identity assignments", "The same 3D instances, three identity maps")
-    for i,(view,label_name) in enumerate(zip(retrieval_comparison_clouds(),
-                    ("Direct projection","Optimal projection","ChromoPhy"))):
-        p = ramp(t,.35+i*.75,1.1+i*.75)
-        x = 77+391*i
-        paste_cloud(im,light(view,p),(x,215))
-        label(im,x+170,559,label_name,p,"#c9b6fa" if i==2 else WHITE,28)
-    caption(im, "The saved UMAP coordinates are shared. Color shows each method’s assigned chromosome class.")
+    im=shot("Fig. 5A–E / live-cell morphology", "How identity order returns in 3D")
+    types=(("direct","Direct projection","Centroids collapse"),
+           ("optimal","Optimal projection","Partial separation"),
+           ("chromoid","ChromoLift + ChromoID","Clearer class order"))
+    classes=(*range(12),22,*range(12,22),23)
+    for i,(name,title,summary) in enumerate(types):
+        x=252+388*i
+        p=ramp(t,.15+.35*i,.82+.35*i)
+        flow=ramp(t,2.5+i*.78,3.65+i*.78)
+        cloud=fitted(STORY/f"identity-{name}.webp",354,354)
+        top=np.array((x-cloud.width/2,391-cloud.height/2))
+        paste(im,light(cloud,p*(1-.52*flow)),(x,391))
+        label(im,x,167,title,p,"#d5c2ff" if i==2 else WHITE,26)
+        label(im,x,584,summary,flow,MUTED,22)
+        if not flow:
+            continue
+        points=np.array(paper_centroids()[name])*cloud.size+top
+        if i:
+            for j,(a,b) in enumerate(zip(points,points[1:])):
+                line(im,tuple(a),tuple(b),tone("#08090d",flow),5)
+                line(im,tuple(a),tuple(b),tone(PALETTE[classes[j]],flow),2)
+        d=ImageDraw.Draw(im)
+        for pos,index in zip(points,classes):
+            dot(d,*pos,5,tone(PALETTE[index],flow),tone(WHITE,flow),1)
+        if i==2:
+            for index,dx,dy in ((0,-15,15),(2,14,12),(7,-10,-19),
+                                (12,-4,-18),(17,1,-19),(21,3,-17),(23,18,-12)):
+                px,py=points[classes.index(index)]
+                text(im,(px+dx,py+dy),CLASS_NAMES[index],17,tone(WHITE,flow),True,"mm")
+    caption(im,"Dots are the paper’s chromosome-class centroids. Lines connect them in identity order.")
     return im
 
 
@@ -1181,29 +1267,34 @@ SCENES = [
     (51,cross_domain,True),
     (65,lambda t: virtual_fish(t*.92),True),
     (77,lambda t: invariant_learning(t*.95),False),
-    (94,lambda t: morphology(t*1.22),True),
-    (101,to_one_point,False),
-    (106,lambda t: population(t*1.15),False),
-    (114,lambda t: native_comparison(t+4.2),False),
-    (117,centroid_comparison,False),
-    (123,projection_failure,True),
-    (130,lambda t: architecture(t,True),False),
-    (133,pose_comparison,True),
-    (145,pose_design,True),
-    (161,segmentation,False),
-    (171,lambda t: lift_training(t*.91),False),
-    (182,batch_lift,False),
-    (193,retrieval_comparison,True),
-    (203,lambda t: atlas_and_match(t+5.9),False),
-    (210,lambda t: live_identity(t,"chr3"),True),
-    (217,live_identity,False),
-    (224,patient_division,True),
-    (237,micromanipulation,True),
-    (243,qpcr_chapter,False),
-    (249,assay_evidence,False),
-    (257,lambda t: treatment_followup(t*.89),True),
-    (270,broader_recovery,False),
-    (280,closing,True),
+    (94,pix_cell_lines,True),
+    (102,pix_scale,False),
+    (110,pix_perturbations,False),
+    (120,pix_virtual_review,True),
+    (129,pix_to_morphology,False),
+    (134,lambda t: morphology(t*1.22),False),
+    (141,to_one_point,False),
+    (146,lambda t: population(t*1.15),False),
+    (154,lambda t: native_comparison(t+4.2),False),
+    (157,centroid_comparison,False),
+    (163,projection_failure,True),
+    (170,lambda t: architecture(t,True),False),
+    (173,pose_comparison,True),
+    (185,pose_design,True),
+    (201,segmentation,False),
+    (211,lambda t: lift_training(t*.91),False),
+    (222,batch_lift,False),
+    (233,atlas_and_match,True),
+    (244,retrieval_comparison,False),
+    (255,lambda t: live_identity(t,"chr3"),True),
+    (262,live_identity,False),
+    (269,patient_division,True),
+    (282,micromanipulation,True),
+    (288,qpcr_chapter,False),
+    (294,assay_evidence,False),
+    (302,lambda t: treatment_followup(t*.89),True),
+    (315,broader_recovery,False),
+    (325,closing,True),
 ]
 
 
@@ -1251,7 +1342,7 @@ def main():
     parser.add_argument("--output-dir",type=Path,default=ASSETS,help="Destination for the silent movie and poster")
     args=parser.parse_args()
     if args.preview:
-        ranges=((21.,43.),(93.,124.),(130.,171.),(192.,211.),(247.,270.))
+        ranges=((21.,43.),(93.,164.),(172.,211.),(221.,256.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
         write_video(args.preview,times,preview=True)
         return
