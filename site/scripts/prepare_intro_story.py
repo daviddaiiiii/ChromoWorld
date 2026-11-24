@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from scipy import ndimage as ndi
 
 
 def save(image, directory, name):
@@ -85,6 +86,19 @@ def fig2_panels(fig2_figure, dest):
             panel = crop(bounds)
             rgb = np.asarray(panel, dtype=np.int16)
             alpha = np.clip((rgb[...,2] - rgb[...,0] - 1)*255./4, 0, 255)
+            # White highlights inside the illustrated centromeres belong to the
+            # drawing. Only key out paper and the open spaces between arms.
+            labels, _ = ndi.label(alpha < 255)
+            sizes = np.bincount(labels.ravel())
+            internal = (labels != 0) & (sizes[labels] <= max(24, round(panel.width**2 * .00035)))
+            alpha[internal] = 255
+            # Match the fill surrounding small neutral highlights on the artwork.
+            # Keep the drawing's narrow outer and internal contour lines.
+            if internal.any():
+                donor = ndi.distance_transform_edt(internal,return_distances=False,return_indices=True)
+                cleaned = rgb.copy()
+                cleaned[internal] = rgb[donor[0][internal],donor[1][internal]]
+                panel = Image.fromarray(cleaned.astype(np.uint8))
             panel = Image.composite(panel, Image.new("RGB", panel.size), Image.fromarray(alpha.astype(np.uint8)))
             save(panel, dest, f"state-{name}")
         # The upper row of Fig. 2D uses G-banding-trained weights for all models.
@@ -98,6 +112,14 @@ def fig5_panels(fig5, dest):
             rgba = image.convert("RGBA")
             base = Image.new("RGB",rgba.size)
             base.paste(rgba,mask=rgba.getchannel("A"))
+            if name == "mip-raw":
+                values = np.array(base.convert("L"),dtype=float)
+                border = np.concatenate((values[:14].ravel(),values[-14:].ravel(),
+                                         values[:,:14].ravel(),values[:,-14:].ravel()))
+                black = np.percentile(border,98)
+                white = np.percentile(values,99.8)
+                display = np.clip((values-black)/(white-black),0,1)
+                base = Image.fromarray(np.uint8(245*display)).convert("RGB")
             save(base,dest,name)
 
 

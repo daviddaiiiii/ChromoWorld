@@ -6,15 +6,15 @@ const asset = (name:string) => base + '/assets/' + name;
 const explorers = [
   { category:'Fixed 2D', title:'Chromosome atlas', img:'atlas-preview.webp',
     alt:'Annotated chromosome in G-banding and FISH microscopy',
-    description:'Browse all 24 chromosome classes and compare reference annotations with ChromoPix predictions.',
+    description:'Choose a chromosome class. Slide between the reference annotation and the ChromoPix prediction.',
     links:[['Open the atlas','/virtual-fish/#class-atlas']] },
   { category:'Live 4D', title:'Mitosis explorer', img:'tracked-preview.webp',
     alt:'A DNA projection next to color-coded tracked chromosomes',
-    description:'Follow individual chromosomes through a division and compare three segmentation methods on synchronized frames.',
+    description:'Follow a division frame by frame, or compare how three models separate the same chromosomes.',
     links:[['Explore tracks',`/live-4d/?sample=${feature.sample}&t=${feature.time}&view=front`],['Compare methods','/live-4d/compare/']] },
   { category:'Morphology', title:'Identity across states', img:'shape-preview.webp',
     alt:'Rainbow-colored morphology maps for G-banding and FISH',
-    description:'Compare the arrangement of chromosome classes in the G-banding and FISH morphology maps.',
+    description:'Find one chromosome class in two maps of shape, one from G-banding and one from FISH.',
     links:[['Explore the maps','/identity-flow/']] },
 ];
 const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[77,'ChromoPix'],[94,'Robustness'],[134,'Morphology & UMAP'],[163,'ChromoPhy'],[173,'ChromoPose'],[211,'ChromoLift'],[233,'ChromoID'],[269,'Patient Chr14'],[302,'Clinical follow-up']];
@@ -23,25 +23,28 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
   <section class="hero">
     <div class="shell hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="spectrum" aria-hidden="true"></span> ChromoWorld</p>
+        <p class="eyebrow"><span class="spectrum" aria-hidden="true"></span> Live-cell karyotyping</p>
         <h1>Chromosome identity in motion.</h1>
-        <p class="lead">From fixed-cell morphology to chromosome segregation in living cells.</p>
+        <p class="lead">A karyotype identifies chromosomes in a single image. Can we follow those same identities as a living cell divides?</p>
         <div class="actions">
-          <a class="button primary" href="#explore">Explore the data <span aria-hidden="true">↓</span></a>
+          <a class="button primary" href="#explore">Explore the data</a>
           <a class="button secondary" href={base+'/methods/'}>See the pipeline</a>
         </div>
       </div>
       <div class="hero-film">
         <figure class="film">
-          <figcaption><strong>A Karyotype in Motion</strong><span>5:38</span></figcaption>
-          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=13')} src={asset('intro.mp4?v=13')} aria-label="ChromoWorld project overview">
+          <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=14')} src={asset('intro.mp4?v=14')} aria-label="A Karyotype in Motion">
             <track kind="captions" srclang="en" label="English" src={asset('intro-en.vtt?v=13')} />
             <track kind="subtitles" srclang="zh-Hans" label="简体中文" src={asset('intro-zh.vtt?v=13')} />
           </video>
+          <figcaption><strong>A Karyotype in Motion</strong><span>5:38</span></figcaption>
         </figure>
-        <div class="chapter-row" aria-label="Jump to a video chapter">
-          {chapters.map(([time,label]) => <button data-time={time} type="button">{label}</button>)}
-        </div>
+        <details class="film-chapters">
+          <summary>Chapters <span id="current-chapter">{chapters[0][1]}</span></summary>
+          <div class="chapter-row" aria-label="Jump to a video chapter">
+            {chapters.map(([time,label]) => <button data-time={time} type="button"><span aria-hidden="true">{Math.floor(Number(time)/60)}:{String(Number(time)%60).padStart(2,'0')}</span>{label}</button>)}
+          </div>
+        </details>
         <p class="film-credit">Music · <a href="https://www.scottbuckley.com.au/library/a-kind-of-hope/">“A Kind Of Hope” by Scott Buckley</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
       </div>
     </div>
@@ -60,14 +63,14 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
             <h3>{item.title}</h3>
             <p>{item.description}</p>
             <div class="actions">
-              {item.links.map(([label,path]) => <a class="text-link" href={base+path}>{label} <span aria-hidden="true">→</span></a>)}
+              {item.links.map(([label,path]) => <a class="text-link" href={base+path}>{label}</a>)}
             </div>
           </div>
         </article>
       ))}
     </div>
     <div class="resource-band">
-      <div><h3>Code, models and datasets</h3><p>Reproduce the figures, run inference or download the data.</p></div>
+      <div><h3>Work with the data</h3><p>Download the microscopy, run a model or reproduce a figure.</p></div>
       <div class="actions">
         <a class="button" href={base+'/datasets/'}>Dataset downloads</a>
         <a class="button" href="https://github.com/daviddaiiiii/ChromoWorld">GitHub <span aria-hidden="true">↗</span></a>
@@ -84,10 +87,17 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
     if (chapter === active) return;
     active?.removeAttribute('aria-current');
     chapter?.setAttribute('aria-current', 'true');
+    if (chapter) document.getElementById('current-chapter')!.textContent = chapter.lastChild?.textContent ?? '';
     active = chapter;
   }
   film.addEventListener('timeupdate', updateChapter);
   film.addEventListener('seeked', updateChapter);
+  const requestedTime = new URL(location.href).searchParams.get('t');
+  if (requestedTime && /^\d+(\.\d+)?$/.test(requestedTime)) {
+    const seek = () => { film.currentTime = Math.min(Number(requestedTime), film.duration); };
+    if (film.readyState >= 1) seek();
+    else film.addEventListener('loadedmetadata', seek, { once: true });
+  }
   updateChapter();
   for (const button of chapters) {
     button.addEventListener('click', () => {

@@ -1,8 +1,8 @@
 # ChromoWorld site
 
-First review build of the project website. The introduction and interactive
-views use local research exports. The live examples with Tag summarize
-manually reviewed candidates.
+The public project site includes the overview film, a fixed-cell atlas,
+morphology maps and a live-cell movie explorer. The tagged examples show
+manually reviewed chromosome candidates alongside the fluorescence measurement.
 
 ```sh
 npm ci
@@ -94,6 +94,13 @@ on the original figures, and extract `image259.png`, `image264.png` and
 The film layers use lossless storage. Presentation raster objects retain
 their native detail. `CHROMOWORLD_FILM_MEDIA` can point the renderer at a
 separate source folder for review.
+
+For the G-banding transfer benchmark, pass the native blue-channel acquisition
+(`2D/test/miscs/dapi/id01_HFF_FISH_00023.png`) as `--transfer-dapi`. The
+renderer checks its registration against the archived evaluation image, then
+places the original model overlays on a wider view of the same chromosome spread.
+The training-view close-up uses the original Chr1 polygon with space around its
+outline. The DNA, probe and reference layers share the same image coordinates.
 
 ### Voice, captions and music
 

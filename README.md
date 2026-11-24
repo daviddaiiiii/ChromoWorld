@@ -1,21 +1,24 @@
-<div align="center">
-
 # ChromoWorld
 
-**Chromosome identity across fixed-cell images and live-cell movies**
+**Following chromosome identity through cell division**
 
-[Project website](https://daviddaiiiii.github.io/ChromoWorld/) · [2D atlas](https://daviddaiiiii.github.io/ChromoWorld/virtual-fish/) · [Live 4D](https://daviddaiiiii.github.io/ChromoWorld/live-4d/) · [Downloads](#data-and-weights) · [Quick start](#quick-start)
+A G-banded spread can tell us which chromosomes a cell contains. Live microscopy
+shows where they move. ChromoWorld connects the two by measuring shape in
+fixed cells and using those measurements to rank the identities of chromosomes
+tracked through mitosis.
 
-<a href="https://daviddaiiiii.github.io/ChromoWorld/"><img src="site/public/assets/social-preview.png" width="920" alt="ChromoWorld. Fixed-cell annotation and color-coded live chromosome tracks."></a>
+[Watch the research film (5:38)](https://daviddaiiiii.github.io/ChromoWorld/) · [Run a first example](#quick-start) · [Download data and weights](#data-and-weights)
 
-</div>
-
-ChromoWorld connects 24-class chromosome segmentation in G-banding and FISH
-with morphology-based identity retrieval from live-cell microscopy. Explore
-references and predictions on the project site, or use this repository to
-run the models and reproduce the figures.
+| [Fixed-cell atlas](https://daviddaiiiii.github.io/ChromoWorld/virtual-fish/) | [Morphology maps](https://daviddaiiiii.github.io/ChromoWorld/identity-flow/) | [Live-cell movies](https://daviddaiiiii.github.io/ChromoWorld/live-4d/) |
+| --- | --- | --- |
+| [![G-banded and FISH chromosome spreads](site/public/assets/atlas-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/virtual-fish/) | [![Chromosome classes in two morphology maps](site/public/assets/shape-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/identity-flow/) | [![Live-cell DNA with tracked chromosome surfaces](site/public/assets/tracked-preview.webp)](https://daviddaiiiii.github.io/ChromoWorld/live-4d/) |
+| Compare annotations and predictions across 24 classes. | Locate the same class in G-banding and FISH. | Follow a division or compare three segmentations. |
 
 ## Models
+
+ChromoPix supplies the fixed-cell references. In the live-cell pipeline,
+ChromoPose separates the chromosomes, ChromoLift builds a reference atlas in
+three dimensions, and ChromoID matches each measured shape to candidate identities.
 
 | Component | Input and output | Guide |
 | --- | --- | --- |
@@ -26,8 +29,8 @@ run the models and reproduce the figures.
 
 ## Quick start
 
-**Reproduce a saved morphology figure.** This route runs on CPU without
-model weights. Use Python 3.10 or later.
+**Plot the fixed-cell morphology map on a CPU.** The embedding is included in
+the repository. Python 3.10 or later and the two packages below are sufficient.
 
 ```bash
 git clone https://github.com/daviddaiiiii/ChromoWorld.git
@@ -67,12 +70,15 @@ Drive archives may require access. The [download guide](docs/downloads.md)
 includes official upstream links and setup instructions for DINOv3, Cellpose-SAM,
 CARE, EmbedSeg, VoxelMorph, FAST-CHIMP and Chimps.
 
-## Research story
+<a id="research-story"></a>
+
+## Interpreting the results
 
 [Read the illustrated research overview](docs/research.md) for the fixed-cell
 identity experiments, cross-state morphology maps and the live-cell pipeline.
-Website comparisons use selected test examples and paired segmentation outputs.
-Live-cell chromosome identities are model-inferred candidates.
+The fixed-cell atlas pairs predictions with annotations. In the live-cell
+movies, a colored track follows a segmented object through time. A chromosome
+number attached to that track represents a model-inferred candidate identity.
 
 The [reproduction guide](Code/Analyze/README.md) separates saved-figure
 reproduction from full historical retraining. The historical ChromoLift

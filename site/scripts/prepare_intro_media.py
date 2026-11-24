@@ -9,7 +9,7 @@ import sys
 from zipfile import ZipFile
 
 import numpy as np
-from PIL import Image, ImageColor, ImageDraw
+from PIL import Image, ImageColor, ImageDraw, ImageFilter
 from scipy import ndimage as ndi
 import tifffile as tf
 
@@ -32,6 +32,47 @@ def original_panel(path, box=None):
         return flatten(image if box is None else image.crop(box))
 
 
+def banding_thumbnail(image, annotations):
+    matte = Image.new("L", image.size)
+    draw = ImageDraw.Draw(matte)
+    for row in annotations.splitlines():
+        coords = np.array(row.split()[1:], dtype=float).reshape(-1, 2) * image.size
+        draw.polygon(list(map(tuple, coords)), fill=255)
+    values = np.asarray(image, dtype=float)
+    background = np.median(values[np.asarray(matte) == 0])
+    white = np.percentile(values[np.asarray(matte) != 0], 99)
+    display = Image.fromarray(np.uint8(np.clip((values-background)/(white-background),0,1)*245))
+    return Image.composite(display, Image.new("L",image.size), matte.filter(ImageFilter.GaussianBlur(1)))
+
+
+def transfer_fields(dapi_path, predictions, out):
+    # The archived inference square is an enlargement of the native acquisition.
+    # Measured on id01_HFF_FISH_00023; check the match before applying predictions.
+    with Image.open(dapi_path) as im:
+        dapi = np.array(im.convert("RGB").getchannel("B"),dtype=np.float32)
+    sx, sy, x0, y0 = .901379, .901324, 1291.951, 791.973
+    baseline = np.asarray(original_panel(predictions / "id01_HFF_FISH_00023_MaskRCNN_banding.png",
+                                         (0,0,1024,1024)),dtype=np.float32)
+    yy,xx = np.mgrid[16:1008:8,72:952:8]
+    sampled = ndi.map_coordinates(dapi,[y0+sy*yy,x0+sx*xx],order=1)
+    if np.corrcoef(sampled.ravel(),baseline[yy,xx,0].ravel())[0,1] < .99:
+        raise ValueError("Full DAPI field does not match the archived benchmark")
+    scale,bias = np.polyfit(sampled.ravel(),baseline[yy,xx,0].ravel(),1)
+    # A single viewport around the spread preserves the tips outside the model input.
+    yy,xx = np.mgrid[680:1850,1170:2340]
+    gray = np.maximum(dapi[yy,xx]*scale+bias-10,0)*1.38
+    coords = [(yy-y0)/sy,(xx-x0)/sx]
+    for name,model in (("mask-rcnn","MaskRCNN"),("v11","YOLOv11-Seg"),("v12","YOLOv12-Seg")):
+        p = predictions / f"id01_HFF_FISH_00023_{model}_banding.png"
+        if not np.array_equal(np.asarray(original_panel(p,(0,0,1024,1024))),baseline):
+            raise ValueError(f"Archived prediction does not share the evaluated field: {model}")
+        pred = np.asarray(original_panel(p,(0,1024,1024,2048)),dtype=np.float32)
+        delta = pred-baseline
+        rgb = np.stack([gray+ndi.map_coordinates(delta[:,:,c],coords,order=1,mode="constant")
+                        for c in range(3)],axis=-1)
+        save(Image.fromarray(np.uint8(np.clip(rgb,0,255))),out,f"banding-only-{name}")
+
+
 def fixed_layers(args):
     out = args.output
     example = json.loads((out/"example.json").read_text())
@@ -45,7 +86,8 @@ def fixed_layers(args):
             data.extract(member,args.figures)
         karyotype(args.figures/"2D/test","Banding_05535",out/"story")
         banding = photo("2D/test/image/Banding_04301.png")
-        save(banding,out,"banding-dna")
+        annotation = data.read("2D/test/label/Banding/Banding_04301.txt").decode()
+        save(banding_thumbnail(banding,annotation),out,"banding-dna")
         dna = photo(f"2D/train/image/{name}.png")
         save(dna,out,"example-dna")
         # Confirm the selected mask against the original annotation before re-rasterizing.
@@ -63,10 +105,19 @@ def fixed_layers(args):
             hit = np.asarray(layer)>0
             score = (hit&old).sum() / (hit|old).sum()
             if score > best_score:
-                best_score,best = score,layer
+                best_score,best,outline = score,layer,polygon
         if best_score < .9:
             raise ValueError(f"Original FISH polygon does not match the film anchor: IoU {best_score:.3f}")
         best.save(out/"example-mask.png")
+        (out/"example-outline.json").write_text(json.dumps(outline.tolist()))
+        # Fig. 3D, object C, the rightmost Chr1 annotation in this specimen.
+        rightmost = max((np.array(row.split()[1:],dtype=float).reshape(-1,2)
+                         for row in lines if row.split()[0] == "0"),key=lambda p:p[:,0].max())
+        contour = Image.new("L",dna.size)
+        ImageDraw.Draw(contour).polygon(list(map(tuple,rightmost*dna.size)),fill=255)
+        detail = Image.composite(dna,Image.new("L",dna.size),contour)
+        x0,y0,x1,y1 = contour.getbbox()
+        save(detail.crop((x0-8,y0-8,x1+8,y1+8)),out/"story","pix-review-detail")
 
     sx,sy,bx,by = json.loads((out/"fish-probe-registration.json").read_text())["processed_to_raw"]
     with Image.open(args.probe) as probe:
@@ -96,10 +147,12 @@ def paper_layers(args):
     fig5_panels(args.ppt_media,out)
     fig5_identity_panels(args.fig5_rasters,args.fig5_vectors,out)
 
-    # The top row of Fig. 2D is backed by these original prediction composites.
-    for name,model in (("mask-rcnn","MaskRCNN"),("v11","YOLOv11-Seg"),("v12","YOLOv12-Seg")):
-        p = args.archive/"archive/fig2"/f"id01_HFF_FISH_00023_{model}_banding.png"
-        save(original_panel(p,(0,1024,1024,2048)),out,f"banding-only-{name}")
+    transfer_fields(args.transfer_dapi,args.archive/"archive/fig2",out)
+    for name,specimen in (("line-hff","id01_HFF_FISH_00013"),("line-mcf","id01_MCF-10F_FISH_00070"),
+                          ("line-rpe","id01_RPE1_FISH_00038"),("line-mrc","idY_MRC5_FISH_00024"),
+                          ("scale-small","id02_MCF-10F_FISH_00067"),("scale-large","id01_MCF-10F_FISH_00139")):
+        p = args.archive/"archive/fig3"/f"{specimen}.png"
+        save(original_panel(p,(0,1024,1024,2048)),out,f"pix-{name}")
     for name,suffix in (("original",""),("rotate","_RRRF"),("crowd","_CP"),("blur","_PSF")):
         p = args.archive/"archive/fig3"/f"id01_HFF_FISH_00003{suffix}.png"
         save(original_panel(p),out,f"pix-perturb-{name}")
@@ -281,7 +334,7 @@ def pose_live_layers(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for option in ("output","dataset","probe","archive","pptx","ppt-media","figures","fig5-rasters",
+    for option in ("output","dataset","probe","transfer-dapi","archive","pptx","ppt-media","figures","fig5-rasters",
                    "fig5-vectors","release","patient","tags","renderer"):
         parser.add_argument("--"+option,type=Path,required=True)
     args = parser.parse_args()

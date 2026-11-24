@@ -207,7 +207,17 @@ def field_view(im, zoom, isolation, center, width, highlight=1.):
     cy = mix(dna.height/2, (top + bottom) / 2, zoom)
     crop = tuple(round(c) for c in (cx-side/2, cy-side/2, cx+side/2, cy+side/2))
     field = blend(blend(dna, marked, highlight), isolated, isolation)
-    paste(im, field.crop(crop).resize((width, width), Image.Resampling.BICUBIC), center)
+    tile = field.crop(crop).resize((width, width), Image.Resampling.BICUBIC)
+    if zoom > .7 and isolation > 0:
+        detail, _ = invariant_example()
+        detail_side = right-left+2*DETAIL_PAD
+        display_width = max(1,round(detail_side*width/side))
+        target = detail.resize((display_width,max(1,round(display_width*detail.height/detail.width))),
+                               Image.Resampling.LANCZOS)
+        precise = Image.new("RGB",tile.size)
+        paste(precise,target,(((right+left)/2-crop[0])*width/side,((bottom+top)/2-crop[1])*width/side))
+        tile = blend(tile,precise,ramp(zoom,.7,1)*isolation)
+    paste(im,tile,center)
     if highlight > 0 and zoom < .7:
         x = center[0] - width / 2 + ((left+right)/2 - crop[0]) * width / (crop[2]-crop[0])
         y = center[1] - width / 2 + ((top+bottom)/2 - crop[1]) * width / (crop[3]-crop[1])
@@ -346,17 +356,16 @@ def virtual_fish(t):
         caption(im,"Follow one FISH-annotated chromosome into morphology space.",p)
         return im
     if t >= 6.3:
-        im = shot("Fixed cells / ChromoPix","Identity, across preparations")
+        im = shot("Fixed cells / ChromoPix","From a probe signal to a predicted identity")
         p = camera(t,6.3,8.2)
         w = 444
         paste(im,fish("reference",w),(334,382))
-        line(im,(640,179),(640,556),HIRULE)
         paste(im,reveal_registered(picture(SOURCE/"example-dna.webp",w),fish("prediction",w),p),(946,382))
         label(im,334,597,"FISH annotation")
         label(im,946,597,"ChromoPix prediction",p)
         caption(im,"ChromoPix learns from both G-banding and FISH to segment and identify chromosomes.")
         return im
-    im = shot("Fixed cells / FISH","Read identity from a DNA probe")
+    im = shot("Fixed cells / FISH","A DNA probe locates chromosome 1")
     pullback = camera(t,0,1.55)
     if pullback < 1:
         field_view(im,1-pullback,1-pullback,(mix(949,640,pullback),mix(379,382,pullback)),
@@ -364,15 +373,15 @@ def virtual_fish(t):
         caption(im,"A sequence-specific fluorescent probe marks Chr1 in this fixed cell.")
         return im
     layer = ramp(t,1.55,2.72)
-    split = camera(t,3.25,5.05)
+    split = camera(t,3.05,4.55)
+    reference = ramp(t,4.60,5.58)
     x = mix(640,334,split)
     w = round(mix(490,444,split))
     paste(im,blend(picture(SOURCE/"example-dna.webp",w),fish_overlay(w),layer),(x,382))
-    if split:
-        line(im,(640,179),(640,556),tone(HIRULE,split))
-        paste(im,light(fish("reference",444),split),(946,382))
+    if reference:
+        paste(im,light(fish("reference",444),reference),(946,382))
     label(im,x,597,"DNA + Chr1 probe" if layer>.40 else "DNA image")
-    label(im,946,597,"FISH annotation",split)
+    label(im,946,597,"FISH annotation",reference)
     caption(im,"A sequence-specific fluorescent probe marks Chr1 in this fixed cell.")
     return im
 
@@ -689,13 +698,13 @@ def segmentation(t):
     x=mix(640,328,split)
     width=round(mix(478,463,split))
     paste(im,fig5_layer(t_image,"dna",width),(x,377))
-    if split:
+    appear = ramp(t,2.42,3.15)
+    if appear:
         mask=fig5_layer(t_image,"mask",463)
         target=fig5_layer(t_image,"track",463)
-        paste(im,light(blend(mask,target,focus),split),(952,377))
-        line(im,(640,177),(640,549),tone(HIRULE,split))
+        paste(im,light(blend(mask,target,focus),appear),(952,377))
     label(im,x,590,"Live DNA projection")
-    label(im,952,590,"Tracked instance" if focus>.55 else "3D instances",split,
+    label(im,952,590,"Tracked instance" if focus>.55 else "3D instances",appear,
           "#c0ddfa" if focus>.55 else WHITE)
     caption(im,"Tracking links the 3D instances in time. Their geometry feeds identity retrieval.")
     return im
@@ -723,7 +732,7 @@ def lift_training(t):
     descriptors=ramp(t,4.8,6.45)
     if project:
         surface,mip=isolated_views(380,258)
-        paste(im,light(reveal_registered(surface,mip,project),project*(1-.87*descriptors)),(899,385))
+        paste(im,light(reveal_registered(surface,mip,project),project*(1-descriptors)),(899,385))
         line(im,(640,191),(640,545),tone(HIRULE,project))
     label(im,355,579,"Measured 3D instance",settle,"#c0ddfa")
     label(im,899,579,"Projection of the same instance",project*(1-descriptors))
@@ -975,7 +984,7 @@ STORY = SOURCE / "story"
 
 
 def karyotype_open(t):
-    im = shot("Karyotype analysis", "What is in a cell’s chromosome set?")
+    im = shot("Karyotype analysis", "What can a karyotype tell us?")
     plate(im, STORY / "karyotype.webp", (425, 372), (680, 421))
     d = ImageDraw.Draw(im)
     p = camera(t, 1.1, 2.25)
@@ -994,14 +1003,12 @@ def karyotype_open(t):
 
 
 def living_question(t):
-    im = shot("Live mitosis", "When does an abnormal karyotype arise?")
+    im = shot("Live mitosis", "Where do the chromosomes go at division?")
     frame_idx = min(18, round(mix(1, 18, camera(t, .15, 6.3))))
     paste(im, live("mitosis", frame_idx, "dna", 482), (640, 365))
     p = ramp(t, 5.2, 6.3)
-    for x in (285, 995):
-        text(im, (x, 342), "?", 69, tone(MUTED, p), True, "ma")
-    label(im, 640, 595, "Which chromosomes went to each daughter?", p, WHITE, 29)
-    caption(im, "A general method for stable chromosome-identity labeling through mitosis is still missing.")
+    label(im, 640, 595, "DNA fluorescence during mitosis", p, WHITE, 27)
+    caption(im, "The DNA signal reveals movement. Following each chromosome also requires an identity.")
     return im
 
 
@@ -1028,12 +1035,12 @@ def architecture(t, emphasis=False):
     for nodes, y, delay, heading in stages:
         status = .46 if emphasis and y==255 else 1
         p = status if emphasis else ramp(t, delay-.65, delay+.2)
-        text(im, (79, y-36), heading, 18, tone(MUTED, p), True)
+        text(im, (284, y-58), heading, 21, tone(MUTED, p), True)
         if y == 255:
-            plate(im,SOURCE/"banding-dna.webp",(692,y-57),(69,69),p)
-            plate(im,SOURCE/"example-dna.webp",(764,y-57),(69,69),p)
+            plate(im,SOURCE/"banding-dna.webp",(120,y-53),(84,84),p)
+            plate(im,SOURCE/"example-dna.webp",(211,y-53),(84,84),p)
         else:
-            paste(im,light(live("mitosis",9,"dna",76),p),(729,y-53))
+            paste(im,light(live("mitosis",9,"dna",88),p),(165,y-54))
         for i, (title, detail) in enumerate(nodes):
             p = status if emphasis else ramp(t, delay+i*.58, delay+i*.58+.72)
             pipeline_node(im, xs[i], y, title, detail, p, title in ("ChromoPix","ChromoLift","ChromoPose"))
@@ -1062,16 +1069,20 @@ def cross_domain(t):
         text(im,(883,440),"G-banding and FISH",23,MUTED)
         caption(im,"Fig. 2B. Each line follows a metric for the same trained model across two preparations.")
         return im
-    im = shot("Fig. 2D / G-banding-only training", "Three frameworks, one FISH field")
-    text(im, (77,153), "All trained on G-banding and evaluated on the same held-out FISH image.", 24, MUTED)
+    im = shot("Fig. 2D / cross-preparation test", "Can a model trained on bands read FISH?")
+    text(im, (77,153), "Three models trained on G-banding. One held-out FISH cell.", 25, MUTED)
     models = (("mask-rcnn", "Mask R-CNN", "No detections"),
               ("v11", "YOLOv11-Seg", "Masks with incorrect IDs"),
               ("v12", "YOLOv12-Seg", "Masks with incorrect IDs"))
     for x, (name, title, detail) in zip((252,640,1028),models):
-        plate(im, STORY/f"banding-only-{name}.webp", (x,380), (354,354))
-        label(im, x, 570, title, size=27)
-        text(im, (x,605), detail, 21, tone(MUTED,ramp(t,7.2,8.25)), anchor="ma")
+        plate(im, STORY/f"banding-only-{name}.webp", (x,386), (367,367))
+        label(im, x, 566, title, size=27)
+        text(im, (x,604), detail, 22, tone(MUTED,ramp(t,7.2,8.25)), anchor="ma")
+    caption(im,"Archived predictions overlaid on the same microscope acquisition.")
     return im
+
+
+DETAIL_PAD = 14
 
 
 @lru_cache(maxsize=1)
@@ -1079,29 +1090,34 @@ def invariant_example():
     from scipy.ndimage import distance_transform_edt, gaussian_filter
 
     # Illustrative morphology-preserving view from the same archived Chr1 mask.
-    _, _, isolated, bbox = microscopy()
-    original = isolated.crop(bbox)
-    with Image.open(SOURCE/"example-mask.png") as source:
-        mask = source.convert("L").resize(isolated.size,Image.Resampling.NEAREST).crop(bbox)
-    binary = np.pad(np.asarray(mask)>0,6)
+    dna, _, _, bbox = microscopy()
+    x0,y0,x1,y1 = bbox
+    view = (x0-DETAIL_PAD,y0-DETAIL_PAD,x1+DETAIL_PAD,y1+DETAIL_PAD)
+    scale = 4
+    texture = dna.crop(view).resize(((view[2]-view[0])*scale,(view[3]-view[1])*scale),Image.Resampling.BICUBIC)
+    points = (np.array(json.loads((SOURCE/"example-outline.json").read_text()))-[view[0],view[1]])*scale
+    mask = Image.new("L",texture.size)
+    ImageDraw.Draw(mask).polygon(list(map(tuple,points)),fill=255)
+    tint = blend(texture,Image.new("RGB",texture.size,ACCENT),.24)
+    original = Image.composite(tint,Image.new("RGB",texture.size),mask)
+    ImageDraw.Draw(original).line([tuple(p) for p in points]+[tuple(points[0])],fill=ACCENT,
+                                  width=scale+1,joint="curve")
+    binary = np.asarray(mask)>0
     distance = distance_transform_edt(binary)
-    core = gaussian_filter(distance,1.6)
-    glow = .34*gaussian_filter(binary.astype(float),1.2)+.66*core/max(1e-6,core.max())
+    core = gaussian_filter(distance,1.6*scale)
+    glow = .34*gaussian_filter(binary.astype(float),1.2*scale)+.66*core/max(1e-6,core.max())
     transformed = Image.fromarray(np.uint8(np.clip(glow,0,1)*255)).convert("RGB")
     return original, transformed
 
 
 def invariant_learning(t):
-    im = shot("ChromoPix / mixed supervision", "Keep identity when texture changes")
+    im = shot("ChromoPix / mixed supervision", "One chromosome, two training views")
     clean, changed = invariant_example()
     for i, (view, label_name) in enumerate(((clean,"Reference view"),(changed,"Shape-preserving view"))):
         p = ramp(t, .35+i*1.05, 1.15+i*1.05)
         x = 306 + i*666
         copy = view.copy()
-        copy.thumbnail((344,250),Image.Resampling.LANCZOS)
-        if max(copy.size)<210:
-            scale = 230/max(copy.size)
-            copy = copy.resize((round(copy.width*scale),round(copy.height*scale)),Image.Resampling.LANCZOS)
+        copy.thumbnail((380,288),Image.Resampling.LANCZOS)
         paste(im,light(copy,p),(x,329))
         label(im,x,476,label_name,p,WHITE,26)
     p = ramp(t, 5.0, 6.1)
@@ -1199,15 +1215,16 @@ def pix_perturbation_charts():
 def pix_virtual_review(t):
     im=shot("ChromoPix / Fig. 3D", "Virtual FISH flags a discordant instance")
     p=ramp(t,1.45,2.55)
-    plate(im,STORY/"pix-review-reference.webp",(259,379),(343,343))
-    plate(im,STORY/"pix-review-prediction.webp",(643,379),(343,343),p)
+    plate(im,SOURCE/"fish-reference.webp",(259,379),(343,343))
+    plate(im,SOURCE/"fish-prediction.webp",(643,379),(343,343),p)
     label(im,259,568,"FISH annotation",size=24)
     label(im,643,568,"ChromoPix prediction",p,WHITE,24)
     q=ramp(t,3.1,4.1)
     if q:
-        dot(ImageDraw.Draw(im),366,404,17,None,tone(PALETTE[0],q),2)
-        dot(ImageDraw.Draw(im),747,404,17,None,tone(PALETTE[16],q),2)
-    plate(im,STORY/"pix-review-instance.webp",(1019,343),(149,144),q)
+        # Center of the discordant FISH polygon in the original 1024-pixel field.
+        for x,col in ((259,PALETTE[0]),(643,PALETTE[16])):
+            dot(ImageDraw.Draw(im),x+(.856469-.5)*343,379+(.530997-.5)*343,18,None,tone(col,q),2)
+    plate(im,STORY/"pix-review-detail.webp",(1019,343),(175,172),q)
     text(im,(1019,442),"FISH annotation  Chr1",23,tone(MUTED,q),anchor="ma")
     text(im,(1019,486),"ChromoPix  Chr17",25,tone(PALETTE[16],q),True,"ma")
     caption(im,"A morphology-based discrepancy calls for review of the assignment.")
@@ -1219,7 +1236,7 @@ def pix_to_morphology(t):
     p=camera(t,.25,1.65)
     reference=Image.new("RGB",(W,H),BLACK)
     field_view(reference,0.,0.,(640,382),452,ramp(t,1.35,3.05))
-    plate(im,STORY/"pix-review-prediction.webp",(640,382),(452,452))
+    plate(im,SOURCE/"fish-prediction.webp",(640,382),(452,452))
     if p:
         im.paste(blend(im.crop((414,156,866,608)),reference.crop((414,156,866,608)),p),(414,156))
     caption(im,"The labeled mask provides a boundary for measuring shape.")
@@ -1404,7 +1421,11 @@ def main():
     args.output_dir.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(dir=args.output_dir) as staging:
         poster=Path(staging)/"intro-poster.webp"
-        image=render(38.)
+        image=Image.new("RGB",(W,H),BLACK)
+        plate(image,SOURCE/"fish-prediction.webp",(322,353),(550,550))
+        plate(image,SOURCE/"patient-6.webp",(950,352),(552,552))
+        label(image,322,598,"Fixed cell",color=WHITE,size=34)
+        label(image,950,598,"Dividing cell",color=WHITE,size=34)
         if args.credits:
             padded=Image.new("RGB",(W,H+112),BLACK)
             padded.paste(image,(0,0))
