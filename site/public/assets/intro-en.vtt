@@ -1,191 +1,183 @@
 WEBVTT
 
-00:00:00.870 --> 00:00:07.707 line:92%,end size:91%
-A karyotype tells us which chromosomes a cell has, how
-many copies there are, and whether their structure has
-changed.
+00:00:00.870 --> 00:00:07.707 line:98%,end size:93%
+A karyotype tells us which chromosomes a cell has, how many
+copies there are, and whether their structure has changed.
 
-00:00:08.560 --> 00:00:11.670 line:92%,end size:91%
-That can help diagnose genetic disorders and some
-cancers.
+00:00:08.560 --> 00:00:11.670 line:98%,end size:93%
+That can help diagnose genetic disorders and some cancers.
 
-00:00:12.390 --> 00:00:17.180 line:92%,end size:91%
-When a living cell divides, can we see where an
-abnormal chromosome count comes from?
+00:00:12.390 --> 00:00:17.180 line:98%,end size:93%
+When a living cell divides, can we see where an abnormal
+chromosome count comes from?
 
-00:00:17.440 --> 00:00:21.780 line:92%,end size:91%
-We lack a general way to label chromosome identities
-through mitosis.
+00:00:17.440 --> 00:00:21.780 line:98%,end size:93%
+We lack a general way to label chromosome identities through
+mitosis.
 
-00:00:22.580 --> 00:00:27.796 line:92%,end size:91%
-ChromoWorld brings two streams together. Fixed cells
-provide the reference identities.
+00:00:22.580 --> 00:00:27.796 line:98%,end size:93%
+ChromoWorld brings two streams together. Fixed cells provide
+the reference identities.
 
-00:00:29.170 --> 00:00:34.535 line:92%,end size:91%
-ChromoPix identifies them, and ChromoLift builds a
-three-dimensional reference atlas.
+00:00:29.170 --> 00:00:34.535 line:98%,end size:93%
+ChromoPix identifies them, and ChromoLift builds a three-
+dimensional reference atlas.
 
-00:00:35.940 --> 00:00:42.073 line:92%,end size:91%
-ChromoPose separates live instances. Tracking links
-them. ChromoID matches their shapes.
+00:00:35.940 --> 00:00:42.073 line:98%,end size:93%
+ChromoPose separates live instances. Tracking links them.
+ChromoID matches their shapes.
 
-00:00:43.500 --> 00:00:50.694 line:92%,end size:91%
+00:00:43.500 --> 00:00:50.694 line:98%,end size:93%
 G-banding shows stripes on dehydrated chromosomes. In
-rehydrated FISH images, the stripes disappear and
-shapes become more varied.
+rehydrated FISH images, the stripes disappear and shapes
+become more varied.
 
-00:00:51.380 --> 00:00:56.720 line:92%,end size:91%
-All three models train on G-banding alone. Each loses
-accuracy when tested on FISH.
+00:00:51.380 --> 00:00:56.720 line:98%,end size:93%
+All three models train on G-banding alone. Each loses accuracy
+when tested on FISH.
 
-00:00:57.050 --> 00:01:04.709 line:92%,end size:91%
-In this FISH field, Mask R-CNN finds no instances. Both
-YOLO models draw masks, but assign incorrect chromosome
-identities.
+00:00:57.050 --> 00:01:04.709 line:98%,end size:93%
+In this FISH field, Mask R-CNN finds no instances. Both YOLO
+models draw masks, but assign incorrect chromosome identities.
 
-00:01:05.500 --> 00:01:11.600 line:92%,end size:91%
-FISH brings us closer. Rehydrated chromosomes lack
-bands, but DNA probes can identify them.
+00:01:05.500 --> 00:01:11.600 line:98%,end size:93%
+FISH brings us closer. Rehydrated chromosomes lack bands, but
+DNA probes can identify them.
 
-00:01:11.880 --> 00:01:15.155 line:92%,end size:91%
+00:01:11.880 --> 00:01:15.155 line:98%,end size:93%
 Probe labels are precise, but sparse within a field.
 
-00:01:17.390 --> 00:01:25.366 line:92%,end size:91%
-ChromoPix learns from the labels and from paired views
-of the same chromosome. One view keeps the shape while
-suppressing fine texture.
+00:01:17.390 --> 00:01:25.366 line:98%,end size:93%
+ChromoPix learns from the labels and from paired views of the
+same chromosome. One view keeps the shape while suppressing
+fine texture.
 
-00:01:25.660 --> 00:01:33.648 line:92%,end size:91%
-Aligning their features rewards what survives that
-change. A chromosome-class prompt lets the decoder
-focus on one identity at a time.
+00:01:25.660 --> 00:01:33.648 line:98%,end size:93%
+Aligning their features rewards what survives that change. A
+chromosome-class prompt lets the decoder focus on one identity
+at a time.
 
-00:01:34.450 --> 00:01:40.157 line:92%,end size:91%
-We tested ChromoPix across four cell lines. The F1
-scores stay in a similar range.
+00:01:34.450 --> 00:01:40.157 line:98%,end size:93%
+We tested ChromoPix across four cell lines. The F1 scores stay
+in a similar range.
 
-00:01:42.380 --> 00:01:48.620 line:92%,end size:91%
-Changing the field of view changes apparent scale.
-Performance holds up better under moderate rescaling.
+00:01:42.380 --> 00:01:48.620 line:98%,end size:93%
+Changing the field of view changes apparent scale. Performance
+holds up better under moderate rescaling.
 
-00:01:50.380 --> 00:01:53.313 line:92%,end size:91%
+00:01:50.380 --> 00:01:53.313 line:98%,end size:93%
 Rotation and flipping barely affect performance.
 
-00:01:54.200 --> 00:01:59.096 line:92%,end size:91%
-Crowding causes a near-linear decline. Stronger blur
-causes larger drops.
+00:01:54.200 --> 00:01:59.096 line:98%,end size:93%
+Crowding causes a near-linear decline. Stronger blur causes
+larger drops.
 
-00:02:00.440 --> 00:02:08.615 line:92%,end size:91%
-Here, FISH labeled this smaller instance as chromosome
-one. ChromoPix called it chromosome seventeen, flagging
-the assignment for review.
+00:02:00.440 --> 00:02:08.615 line:98%,end size:93%
+Here, FISH labeled this smaller instance as chromosome one.
+ChromoPix called it chromosome seventeen, flagging the
+assignment for review.
 
-00:02:09.340 --> 00:02:12.657 line:92%,end size:91%
+00:02:09.340 --> 00:02:12.657 line:98%,end size:93%
 Now follow one chromosome where the assignments agree.
 
-00:02:14.450 --> 00:02:19.026 line:92%,end size:91%
-We measure one tagged chromosome, then use UMAP to
-place its shape at a point.
+00:02:14.450 --> 00:02:19.026 line:98%,end size:93%
+We measure one tagged chromosome, then use UMAP to place its
+shape at a point.
 
-00:02:25.320 --> 00:02:33.331 line:92%,end size:91%
-Pull back to more than seven hundred thousand
-chromosome instances. Each point has a shape, and its
-color marks a chromosome class.
+00:02:25.320 --> 00:02:33.331 line:98%,end size:93%
+Pull back to more than seven hundred thousand chromosome
+instances. Each point has a shape, and its color marks a
+chromosome class.
 
-00:02:34.510 --> 00:02:41.795 line:92%,end size:91%
-Across both preparations, the classes follow a similar
-order. Can those relationships carry over to living
-cells?
+00:02:34.510 --> 00:02:41.795 line:98%,end size:93%
+Across both preparations, the classes follow a similar order.
+Can those relationships carry over to living cells?
 
-00:02:43.470 --> 00:02:49.305 line:92%,end size:91%
-Whole-cell projections can collapse identities. Better
-views recover only part of the order.
+00:02:43.470 --> 00:02:49.305 line:98%,end size:93%
+Whole-cell projections can collapse identities. Better views
+recover only part of the order.
 
-00:02:50.120 --> 00:02:52.820 line:92%,end size:91%
+00:02:50.120 --> 00:02:52.820 line:98%,end size:93%
 First, separate the chromosomes in three dimensions.
 
-00:02:53.420 --> 00:02:59.620 line:92%,end size:91%
-Here FAST-CHIMP produces many small fragments.
-Cellpose-SAM shows broader, joined-looking regions.
+00:02:53.420 --> 00:02:59.620 line:98%,end size:93%
+Here FAST-CHIMP produces many small fragments. Cellpose-SAM
+shows broader, joined-looking regions.
 
-00:03:00.100 --> 00:03:03.780 line:92%,end size:91%
-ChromoPose better preserves long, separate shapes in
-this frame.
+00:03:00.100 --> 00:03:03.780 line:98%,end size:93%
+ChromoPose better preserves long, separate shapes in this
+frame.
 
-00:03:05.470 --> 00:03:12.600 line:92%,end size:91%
-To follow a bend, ChromoPose first uses predicted
-distance and flow to move voxels toward the local
-centerline.
+00:03:05.470 --> 00:03:12.600 line:98%,end size:93%
+To follow a bend, ChromoPose first uses predicted distance and
+flow to move voxels toward the local centerline.
 
-00:03:12.940 --> 00:03:18.903 line:92%,end size:91%
-Then it follows the learned flow along the bend. Voxels
-that converge together form one instance.
+00:03:12.940 --> 00:03:18.903 line:98%,end size:93%
+Then it follows the learned flow along the bend. Voxels that
+converge together form one instance.
 
-00:03:21.550 --> 00:03:29.731 line:92%,end size:91%
+00:03:21.550 --> 00:03:29.731 line:98%,end size:93%
 Tracking links those three-dimensional instances across
-frames. Their measured shapes become the input for
-chromosome identification.
+frames. Their measured shapes become the input for chromosome
+identification.
 
-00:03:31.280 --> 00:03:40.955 line:92%,end size:91%
+00:03:31.280 --> 00:03:40.955 line:98%,end size:93%
 A live chromosome provides its own training pair: its
-projection and its measured three-dimensional shape,
-including volume, elongation, and sphericity.
+projection and its measured three-dimensional shape, including
+volume, elongation, and sphericity.
 
-00:03:42.370 --> 00:03:51.405 line:92%,end size:91%
-ChromoLift learns that mapping with flow matching. It
-moves compact shape descriptors, so thousands of
-labeled references can be lifted in batches.
+00:03:42.370 --> 00:03:51.405 line:98%,end size:93%
+ChromoLift learns that mapping with flow matching. It moves
+compact shape descriptors, so thousands of labeled references
+can be lifted in batches.
 
-00:03:53.480 --> 00:03:59.180 line:92%,end size:91%
-ChromoID compares each live instance with class
-prototypes from the lifted reference atlas.
+00:03:53.480 --> 00:03:59.180 line:98%,end size:93%
+ChromoID compares each live instance with class prototypes
+from the lifted reference atlas.
 
-00:03:59.550 --> 00:04:02.739 line:92%,end size:91%
+00:03:59.550 --> 00:04:02.739 line:98%,end size:93%
 It then assigns identity slots jointly within the cell.
 
-00:04:04.480 --> 00:04:14.650 line:92%,end size:91%
-The class centers nearly overlap after direct
-projection. Optimal views separate them partly. With
-ChromoLift and ChromoID, the class order becomes
-clearer.
+00:04:04.480 --> 00:04:14.650 line:98%,end size:93%
+The class centers nearly overlap after direct projection.
+Optimal views separate them partly. With ChromoLift and
+ChromoID, the class order becomes clearer.
 
-00:04:15.500 --> 00:04:20.268 line:92%,end size:91%
-We can compare the reviewed chromosome three candidates
-with the measured fluorescence.
+00:04:15.500 --> 00:04:20.268 line:98%,end size:93%
+We can compare the reviewed chromosome three candidates with
+the measured fluorescence.
 
-00:04:22.270 --> 00:04:27.443 line:92%,end size:91%
-For chromosome eighteen, the tag also lets us check
-where the candidates sit over time.
+00:04:22.270 --> 00:04:27.443 line:98%,end size:93%
+For chromosome eighteen, the tag also lets us check where the
+candidates sit over time.
 
-00:04:29.530 --> 00:04:38.117 line:92%,end size:91%
-In patient-derived tumor cells, imaging suggested that
-one daughter received two copies of chromosome fourteen
-and the other received four.
+00:04:29.530 --> 00:04:38.117 line:98%,end size:93%
+In patient-derived tumor cells, imaging suggested that one
+daughter received two copies of chromosome fourteen and the
+other received four.
 
-00:04:42.420 --> 00:04:45.951 line:92%,end size:91%
-We isolated daughter cells and grew them into separate
-clones.
+00:04:42.420 --> 00:04:45.951 line:98%,end size:93%
+We isolated daughter cells and grew them into separate clones.
 
-00:04:48.260 --> 00:04:51.364 line:92%,end size:91%
+00:04:48.260 --> 00:04:51.364 line:98%,end size:93%
 Copy-number differences persisted across passages.
 
-00:04:54.290 --> 00:05:01.447 line:92%,end size:91%
-Higher-copy clones showed stronger AKT signaling and
-greater sensitivity to capivasertib in the lab.
+00:04:54.290 --> 00:05:01.447 line:98%,end size:93%
+Higher-copy clones showed stronger AKT signaling and greater
+sensitivity to capivasertib in the lab.
 
-00:05:02.530 --> 00:05:07.575 line:92%,end size:91%
+00:05:02.530 --> 00:05:07.575 line:98%,end size:93%
 The clinical team independently chose capivasertib with
 endocrine therapy.
 
-00:05:08.050 --> 00:05:13.607 line:92%,end size:91%
-Liver target lesions shrank by nearly a third at eight
-weeks, and by nearly half at eighteen.
+00:05:08.050 --> 00:05:13.607 line:98%,end size:93%
+Liver target lesions shrank by nearly a third at eight weeks,
+and by nearly half at eighteen.
 
-00:05:15.560 --> 00:05:22.568 line:92%,end size:91%
-Tumor markers and liver biochemistry improved. Daily
-function improved too, with less liver pain and
-fatigue.
+00:05:15.560 --> 00:05:22.568 line:98%,end size:93%
+Tumor markers and liver biochemistry improved. Daily function
+improved too, with less liver pain and fatigue.
 
-00:05:25.650 --> 00:05:32.125 line:92%,end size:91%
-Reading chromosome identities in living cells lets us
-ask what an unequal division sets in motion.
+00:05:25.650 --> 00:05:32.125 line:98%,end size:93%
+Reading chromosome identities in living cells lets us ask what
+an unequal division sets in motion.

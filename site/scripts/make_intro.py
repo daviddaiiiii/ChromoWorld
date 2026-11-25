@@ -1,12 +1,14 @@
 """Render the homepage explainer from microscopy and archived morphology embeddings."""
 from functools import lru_cache
 import argparse
+from bisect import bisect_right
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 
+import cv2
 import imageio_ffmpeg
 import numpy as np
 from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageEnhance, ImageFilter, ImageFont
@@ -16,6 +18,8 @@ ASSETS = SITE / "public/assets"
 SOURCE = Path(os.environ.get("CHROMOWORLD_FILM_MEDIA", SITE / "src/data/overview"))
 FIG4 = SITE.parent / "release/Artifacts/fig4"
 W, H, FPS, DURATION = 1280, 720, 24, 333
+GUIDE_HEIGHT, CAPTION_SPACE = 64, 176
+FILM_HEIGHT = H + GUIDE_HEIGHT + CAPTION_SPACE
 BLACK, WHITE, MUTED = "#000000", "#f8faff", "#c1c6d4"
 GRID, AXIS, HIRULE = "#151a20", "#626b77", "#262a32"
 FONT = Path("/System/Library/Fonts/Supplemental")
@@ -172,6 +176,42 @@ def reveal_registered(before, after, p, feather=25):
 
 def live(case, t, layer, width):
     return picture(SOURCE / f"live/{case}/{t}-{layer}.webp", width)
+
+
+@lru_cache(maxsize=4)
+def pixel_grid(width):
+    return np.stack(np.meshgrid(np.arange(width,dtype=np.float32),
+                                np.arange(width,dtype=np.float32)),axis=-1)
+
+
+def sequence_frame(frame, indices, layer_path, width, motion_path=None):
+    """Render an in-between display frame, with exact acquired images at the knots."""
+    index = min(int(frame),len(indices)-1)
+    fraction = float(frame - index)
+    start = indices[index]
+    first = picture(layer_path(start),width)
+    if fraction < 1e-6 or index == len(indices)-1:
+        return first
+    end = indices[index+1]
+    second = picture(layer_path(end),width)
+    reference = motion_path or layer_path
+    forward, backward = sequence_flow(reference(start),reference(end))
+    grid = pixel_grid(width)
+
+    def warp(image, vectors, amount):
+        fields = cv2.resize(vectors,(width,width),interpolation=cv2.INTER_LINEAR)
+        coords = grid-fields*(width/vectors.shape[0])*amount
+        return Image.fromarray(cv2.remap(np.asarray(image),coords,None,cv2.INTER_LINEAR))
+
+    return blend(warp(first,forward,fraction),warp(second,backward,1-fraction),fraction)
+
+
+@lru_cache(maxsize=64)
+def sequence_flow(first, second):
+    a = np.asarray(picture(first,256).convert("L"))
+    b = np.asarray(picture(second,256).convert("L"))
+    flow = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+    return flow.calc(a,b,None), flow.calc(b,a,None)
 
 
 def fish(layer, width):
@@ -598,6 +638,12 @@ def fig5_layer(time,layer,width):
     return picture(SOURCE/f"fig5-live/{time}-{layer}.webp",width)
 
 
+def tracking_view(position, layer, width):
+    return sequence_frame(position, fig5_frames(),
+                          lambda time: SOURCE/f"fig5-live/{time}-{layer}.webp",width,
+                          lambda time: SOURCE/f"fig5-live/{time}-dna.webp")
+
+
 def pose_comparison(t):
     im = shot("ChromoPose / Supplementary Fig. S2c", "The same frame, three segmentations")
     methods = (
@@ -691,22 +737,20 @@ def pose_design(t):
 def segmentation(t):
     im=shot("ChromoPose / tracking","Follow the same chromosome")
     frames=fig5_frames()
-    index=min(len(frames)-1,int(clamp((t-.75)/7.4)*len(frames)))
-    t_image=frames[index]
-    split=camera(t,.75,2.4)
+    frame=mix(0,len(frames)-1,clamp((t-.38)/8.0))
+    split=camera(t,.35,2.15)
     focus=ramp(t,2.7,3.72)
     x=mix(640,328,split)
     width=round(mix(478,463,split))
-    paste(im,fig5_layer(t_image,"dna",width),(x,377))
-    appear = ramp(t,2.42,3.15)
+    paste(im,tracking_view(frame,"dna",width),(x,377))
+    appear = ramp(t,1.5,2.7)
     if appear:
-        mask=fig5_layer(t_image,"mask",463)
-        target=fig5_layer(t_image,"track",463)
+        mask=tracking_view(frame,"mask",463)
+        target=tracking_view(frame,"track",463)
         paste(im,light(blend(mask,target,focus),appear),(952,377))
     label(im,x,590,"Live DNA projection")
-    label(im,952,590,"Tracked instance" if focus>.55 else "3D instances",appear,
-          "#c0ddfa" if focus>.55 else WHITE)
-    caption(im,"Tracking links the 3D instances in time. Their geometry feeds identity retrieval.")
+    label(im,952,590,"Tracked 3D instances",appear)
+    caption(im,"The blue instance is linked across acquired frames. Playback is interpolated between frames.")
     return im
 
 
@@ -719,15 +763,34 @@ def isolated_views(width,height):
     return reference,projected
 
 
+@lru_cache(maxsize=1)
+def tracking_anchor():
+    scene = fig5_layer(fig5_frames()[-1],"track",463)
+    red, green, blue = np.asarray(scene,dtype=np.int16).transpose(2,0,1)
+    tint = Image.fromarray((blue-red>30)&(green-red>14)&(blue>35))
+    left,top,right,bottom = tint.getbbox()
+    return (952+(left+right-scene.width)/2,377+(top+bottom-scene.height)/2),right-left
+
+
 def lift_training(t):
     im=shot("ChromoLift / self-supervised training","Learn what projection loses")
-    settle=camera(t,.18,1.86)
-    if settle<1:
-        paste(im,light(fig5_layer(fig5_frames()[-1],"track",463),1-settle),(952,377))
-    x=mix(1046,355,settle)
-    width=round(mix(132,414,settle))
-    body,_=isolated_views(width,260)
-    paste(im,body,(x,mix(343,385,settle)))
+    anchor_t=fig5_frames()[-1]
+    dissolve=ramp(t,.12,.86)
+    settle=camera(t,.38,2.0)
+    if dissolve<1:
+        paste(im,light(fig5_layer(anchor_t,"dna",463),1-dissolve),(328,377))
+        paste(im,light(fig5_layer(anchor_t,"track",463),1-dissolve),(952,377))
+    (anchor_x,anchor_y),anchor_width=tracking_anchor()
+    body=picture(SOURCE/"tracked-chromosome-3d.webp")
+    body=body.crop(body.getbbox())
+    width=round(mix(anchor_width,331,settle))
+    body=body.resize((width,round(width*body.height/body.width)),Image.Resampling.LANCZOS)
+    center=(mix(anchor_x,355,settle),mix(anchor_y,385,settle))
+    if dissolve:
+        left,top=round(center[0]-body.width/2),round(center[1]-body.height/2)
+        box=(left,top,left+body.width,top+body.height)
+        context=im.crop(box)
+        im.paste(ImageChops.lighter(context,light(body,dissolve)),(left,top))
     project=camera(t,2.02,3.83)
     descriptors=ramp(t,4.8,6.45)
     if project:
@@ -780,23 +843,27 @@ def atlas_and_match(t):
 def live_identity(t, case="chr18"):
     im=shot("ChromoPhy / fluorescence comparison","Compare candidates with fluorescence")
     p=ramp(t,1.05,2.58)
-    frame=min(7,(2 if case=="chr3" else 1)+int(t*.76))
-    paste(im,live(case,frame,"candidates",451),(329,379))
-    dna=live(case,frame,"dna",451)
-    tag=live(case,frame,"dna-tag",451)
+    indices=range(2 if case=="chr3" else 1,8)
+    frame=min(len(indices)-1,t*.76)
+    def view(layer):
+        return sequence_frame(frame,indices,lambda time: SOURCE/f"live/{case}/{time}-{layer}.webp",
+                              451,lambda time: SOURCE/f"live/{case}/{time}-dna.webp")
+    paste(im,view("candidates"),(329,379))
+    dna=view("dna")
+    tag=view("dna-tag")
     paste(im,blend(dna,tag,p),(951,379))
     line(im,(640,174),(640,547),HIRULE)
     label(im,329,588,f"Chr{case[3:]} candidates")
-    label(im,951,588,"DNA + fluorescent tag" if p>.40 else "Live DNA")
+    label(im,951,588,"Live DNA and fluorescence")
     caption(im,"Manually reviewed candidates are shown beside the measured Tag signal.")
     return im
 
 
 def patient_division(t):
     im=shot("Patient-derived tumor cells","An unequal split of chromosome 14")
-    frame=min(9,int(t*1.13))
+    frame=min(9,t*1.13)
     p=ramp(t,.6,2.4)
-    source=picture(SOURCE/f"patient-{frame}.webp")
+    source=sequence_frame(frame,range(10),lambda time: SOURCE/f"patient-{time}.webp",672)
     scale=source.width/420
     crop=tuple(round(v*scale) for v in (43,45,363,375))
     image=source.crop(crop)
@@ -986,11 +1053,7 @@ STORY = SOURCE / "story"
 def karyotype_open(t):
     im = shot("Karyotype analysis", "What can a karyotype tell us?")
     plate(im, STORY / "karyotype.webp", (425, 372), (680, 421))
-    d = ImageDraw.Draw(im)
-    p = camera(t, 1.1, 2.25)
-    if p:
-        d.rounded_rectangle((86, 161, 166, 295), radius=9, outline=tone(ACCENT, p), width=2)
-        line(im, (797, 183), (797, 565), tone(HIRULE, p))
+    line(im, (797, 183), (797, 565), HIRULE)
     for i, (title, detail) in enumerate((("Identity", "Which chromosome?"),
                                            ("Copy number", "How many copies?"),
                                            ("Structure", "Has it changed?"))):
@@ -1004,8 +1067,9 @@ def karyotype_open(t):
 
 def living_question(t):
     im = shot("Live mitosis", "Where do the chromosomes go at division?")
-    frame_idx = min(18, round(mix(1, 18, camera(t, .15, 6.3))))
-    paste(im, live("mitosis", frame_idx, "dna", 482), (640, 365))
+    frame = mix(0,17,camera(t,.15,7.8))
+    paste(im,sequence_frame(frame,range(1,19),lambda time: SOURCE/f"live/mitosis/{time}-dna.webp",482),
+          (640,365))
     p = ramp(t, 5.2, 6.3)
     label(im, 640, 595, "DNA fluorescence during mitosis", p, WHITE, 27)
     caption(im, "The DNA signal reveals movement. Following each chromosome also requires an identity.")
@@ -1319,7 +1383,7 @@ def batch_lift(t):
 # object-to-point handoffs cut in place so no pair of headlines overlaps.
 SCENES = [
     (0,karyotype_open,False),
-    (12,living_question,False),
+    (12,living_question,True),
     (22,architecture,True),
     (43,preparation_states,True),
     (51,cross_domain,True),
@@ -1346,7 +1410,7 @@ SCENES = [
     (233,atlas_and_match,True),
     (244,retrieval_comparison,False),
     (255,lambda t: live_identity(t,"chr3"),True),
-    (262,live_identity,False),
+    (262,live_identity,True),
     (269,patient_division,True),
     (282,micromanipulation,True),
     (288,qpcr_chapter,False),
@@ -1355,6 +1419,36 @@ SCENES = [
     (315,broader_recovery,False),
     (325,closing,True),
 ]
+
+
+GUIDE_STAGES = (
+    (0, "Overview"),
+    (65, "ChromoPix"),
+    (129, "Morphology"),
+    (163, "ChromoPhy"),
+    (170, "ChromoPose"),
+    (201, "Tracking"),
+    (211, "ChromoLift"),
+    (233, "ChromoID"),
+    (269, "Applications"),
+)
+GUIDE_TIMES = tuple(start for start, _ in GUIDE_STAGES)
+
+
+@lru_cache(maxsize=len(GUIDE_STAGES))
+def guide(active):
+    strip=Image.new("RGB",(W,GUIDE_HEIGHT),"#100d16")
+    draw=ImageDraw.Draw(strip)
+    draw.line((0,GUIDE_HEIGHT-1,W,GUIDE_HEIGHT-1),fill="#30283b")
+    slot=(W-96)/len(GUIDE_STAGES)
+    for i,(_, title) in enumerate(GUIDE_STAGES):
+        center=48+(i+.5)*slot
+        if i==active:
+            draw.rounded_rectangle((round(center-slot/2+4),13,round(center+slot/2-4),52),
+                                   radius=10,fill="#3a2854")
+        ink = "#f3eaff" if i==active else "#aea6b9"
+        text(strip,(center,33),title,19,ink,i==active,"mm")
+    return strip
 
 
 def render(t):
@@ -1373,18 +1467,26 @@ def render(t):
     raise ValueError(f"Negative video time {t}")
 
 
+def film_frame(t, scene=None):
+    frame=Image.new("RGB",(W,FILM_HEIGHT),BLACK)
+    frame.paste(guide(bisect_right(GUIDE_TIMES,t)-1),(0,0))
+    frame.paste(render(t) if scene is None else scene,(0,GUIDE_HEIGHT))
+    return frame
+
+
 def write_video(path, times, preview=False, credits=None, audio=None):
     ffmpeg=imageio_ffmpeg.get_ffmpeg_exe()
-    frame_size=(640,360) if preview else (W,H)
+    frame_size=(W//2,FILM_HEIGHT//2) if preview else (W,FILM_HEIGHT)
     cmd=[ffmpeg,"-hide_banner","-loglevel","error","-y","-f","rawvideo",
          "-pixel_format","rgb24","-video_size",f"{frame_size[0]}x{frame_size[1]}",
          "-framerate",str(FPS),"-i","pipe:0"]
     if credits:
+        audio_codec = ["-c:a","copy"] if audio.suffix.lower()==".m4a" else ["-c:a","aac","-b:a","192k"]
         cmd += ["-i",str(credits),"-i",str(audio),"-filter_complex",
                 "[0:v]setsar=1,format=yuv420p,setpts=PTS-STARTPTS[film];"
-                "[1:v]setsar=1,format=yuv420p,setpts=PTS-STARTPTS[credit];"
-                "[film][credit]concat=n=2:v=1:a=0,pad=iw:ih+112:0:0:black[v]",
-                "-map","[v]","-map","2:a","-t",str(DURATION+5),"-c:a","aac","-b:a","192k",
+                f"[1:v]pad=iw:{FILM_HEIGHT}:0:(oh-ih)/2:black,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[credit];"
+                "[film][credit]concat=n=2:v=1:a=0[v]",
+                "-map","[v]","-map","2:a","-t",str(DURATION+5),*audio_codec,
                 "-metadata","comment=Music: A Kind Of Hope by Scott Buckley (CC BY 4.0)."]
     else:
         cmd += ["-an"]
@@ -1394,7 +1496,7 @@ def write_video(path, times, preview=False, credits=None, audio=None):
         for i,t in enumerate(times):
             if i%(10*FPS)==0:
                 print(f"Rendering at {t:.1f}s",flush=True)
-            im=render(t)
+            im=film_frame(t)
             if preview:
                 im=im.resize(frame_size,Image.Resampling.LANCZOS)
             proc.stdin.write(im.tobytes())
@@ -1409,12 +1511,12 @@ def main():
     parser.add_argument("--preview",type=Path,help="Render a short review of the revised transitions")
     parser.add_argument("--output-dir",type=Path,default=ASSETS,help="Destination for the silent movie and poster")
     parser.add_argument("--credits",type=Path,help="Five-second, 1280×720 credits composition")
-    parser.add_argument("--audio-master",type=Path,help="Mastered narration and music WAV")
+    parser.add_argument("--audio-master",type=Path,help="Mastered narration and music WAV or AAC in M4A")
     args=parser.parse_args()
     if bool(args.credits) != bool(args.audio_master):
         parser.error("Pass both --credits and --audio-master for the final film.")
     if args.preview:
-        ranges=((21.,43.),(93.,164.),(172.,211.),(221.,256.))
+        ranges=((0.,8.),(198.,217.),(253.,275.))
         times=(i/FPS for a,b in ranges for i in range(round(a*FPS),round(b*FPS)))
         write_video(args.preview,times,preview=True)
         return
@@ -1426,17 +1528,13 @@ def main():
         plate(image,SOURCE/"patient-6.webp",(950,352),(552,552))
         label(image,322,598,"Fixed cell",color=WHITE,size=34)
         label(image,950,598,"Dividing cell",color=WHITE,size=34)
-        if args.credits:
-            padded=Image.new("RGB",(W,H+112),BLACK)
-            padded.paste(image,(0,0))
-            image=padded
-        image.save(poster,"WEBP",lossless=True)
+        film_frame(0,image).save(poster,"WEBP",lossless=True)
         video=Path(staging)/"intro.mp4"
         write_video(video,(i/FPS for i in range(DURATION*FPS)),credits=args.credits,audio=args.audio_master)
         if args.credits:
             stream = Path(staging)/"intro-stream.webm"
             subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),"-hide_banner","-loglevel","error","-y",
-                            "-i",str(video),"-map","0:v:0","-map","0:a:0","-vf","scale=960:624:flags=lanczos",
+                            "-i",str(video),"-map","0:v:0","-map","0:a:0","-vf","scale=960:-2:flags=lanczos",
                             "-c:v","libvpx-vp9","-row-mt","1","-tile-columns","1","-cpu-used","5","-threads","6",
                             "-crf","33","-b:v","0","-g","72","-pix_fmt","yuv420p","-c:a","libopus","-b:a","72k",
                             "-reserve_index_space","8192",str(stream)],check=True)

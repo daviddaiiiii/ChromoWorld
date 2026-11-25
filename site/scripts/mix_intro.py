@@ -17,6 +17,7 @@ from scipy.signal import resample_poly
 FPS = 24
 RATE = 48_000
 DURATION = 338
+FILM_HEIGHT = 960
 VOICE = "af_heart"
 CUES = Path(__file__).with_name("intro_narration.json")
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
@@ -83,8 +84,8 @@ def narration(model, work):
     for lang, cues in captions.items():
         blocks = []
         for cue in cues:
-            times = cue_time(cue["startMs"]/1000)+" --> "+cue_time(cue["endMs"]/1000)+" line:92%,end size:91%"
-            caption = textwrap.fill(cue["text"],width=55) if lang == "en" else cue["text"]
+            times = cue_time(cue["startMs"]/1000)+" --> "+cue_time(cue["endMs"]/1000)+" line:98%,end size:93%"
+            caption = textwrap.fill(cue["text"],width=62) if lang == "en" else cue["text"]
             blocks.append(times+"\n"+caption)
         (work/f"intro-{lang}.vtt").write_text("WEBVTT\n\n"+"\n\n".join(blocks)+"\n",encoding="utf-8")
     return dialogue
@@ -130,9 +131,9 @@ def master(work, score, dialogue):
 
 def encode_overview(video, credits, sound, output):
     ffmpeg("-i",video,"-i",credits,"-i",sound,
-           "-filter_complex","[0:v]setpts=PTS-STARTPTS[film];"
-           "[1:v]setpts=PTS-STARTPTS[credit];[film][credit]concat=n=2:v=1:a=0,"
-           "pad=iw:ih+112:0:0:black[v]",
+           "-filter_complex",f"[0:v]pad=iw:{FILM_HEIGHT}:0:0:black,setsar=1,setpts=PTS-STARTPTS[film];"
+           f"[1:v]pad=iw:{FILM_HEIGHT}:0:(oh-ih)/2:black,setsar=1,setpts=PTS-STARTPTS[credit];"
+           "[film][credit]concat=n=2:v=1:a=0[v]",
            "-map","[v]","-map","2:a","-t",DURATION,"-r",FPS,"-c:v","libx264","-preset","fast",
            "-crf",18,"-threads",4,"-pix_fmt","yuv420p","-c:a","aac","-b:a","160k","-movflags","+faststart",
            "-metadata","comment=Music: A Kind Of Hope by Scott Buckley (CC BY 4.0); excerpt and mix.",output)

@@ -56,9 +56,10 @@ centroids use the same transform. Live assignments are inferred by ChromoID.
 
 ## Homepage film
 
-The player first offers a 960 × 624 VP9/Opus WebM for streaming. The original
-1280 × 832 H.264/AAC MP4 is available through the same player and the HD link.
-Both use the same chapters and bilingual captions.
+The player first offers a 960 × 720 VP9/Opus WebM for streaming. The
+1280 × 960 H.264/AAC MP4 is available through the same player and the HD link.
+Both use the same chapters and bilingual captions. In the embedded player,
+captions appear below the image to keep figure labels clear.
 
 The opening karyotype uses the held-out G-banding field `Banding_04301`.
 Its reference annotations contain two copies of autosomes 1–22, one X and one Y.
@@ -83,7 +84,7 @@ the markers in the paper's chromosome order. To regenerate those assets,
 extract the original raster layers with `pdfimages -png FIG5 FIG5_RASTERS/fig5`
 and the vector markers with `pdftocairo -svg FIG5 FIG5.svg`.
 
-Run `python scripts/make_intro.py` with Pillow, NumPy and imageio-ffmpeg
+Run `python scripts/make_intro.py` with Pillow, NumPy, OpenCV and imageio-ffmpeg
 installed. This writes the video and poster using the microscopy exports
 and the saved Fig. 4 and Fig. 5 embeddings in the sibling
 `release/Artifacts` directory. The morphology example in `src/data/overview`
@@ -93,6 +94,10 @@ the separately fitted G-banding and FISH maps to the joint map. The lifted
 atlas uses the original Fig. 5D object and the instance count from Lifted2D.
 The tracking, ChromoLift and ChromoID shots share the Fig. 5f movie and
 tracked instance recorded in `src/data/overview/fig5-live/source.json`.
+The fixed strip above the film highlights the current part of the story.
+The time-lapse scenes interpolate display frames using optical flow. Paired
+DNA and mask panels share the same motion field. The acquired frames and
+source segmentations are preserved.
 
 `src/data/overview/patient-source.json` records the patient sequence and
 its frame matches to the paper presentation. The patient scene uses the
@@ -136,9 +141,9 @@ in Remotion. With Kokoro ONNX, SciPy and imageio-ffmpeg available, run
 `python scripts/mix_intro.py SILENT_MP4 CREDITS_MP4 SCORE_MP3 KOKORO_ONNX VOICES_BIN OUTPUT_DIR`.
 This writes the final MP4 and both subtitle tracks.
 
-With the existing mastered WAV, `make_intro.py --credits CREDITS_MP4
---audio-master MASTER_WAV --output-dir OUTPUT_DIR` encodes directly from
-the composed frames at higher quality in one pass.
+With an existing soundtrack in WAV or AAC (M4A), `make_intro.py --credits
+CREDITS_MP4 --audio-master SOUNDTRACK --output-dir OUTPUT_DIR` encodes
+directly from the composed frames and creates the streaming WebM.
 
 Music is an excerpt of [“A Kind Of Hope” by Scott Buckley](https://www.scottbuckley.com.au/library/a-kind-of-hope/),
 licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

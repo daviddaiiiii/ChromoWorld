@@ -43,9 +43,14 @@ p{margin-bottom:16px}
 .hero h1{font-size:clamp(2.6rem,4.55vw,4.7rem);line-height:1.02;overflow-wrap:anywhere;text-wrap:balance}
 .hero .button.primary{background:#dbcaff;color:#2b194b;border-color:#dbcaff}
 .hero .button.secondary{background:transparent;color:var(--on-dark);border-color:#60546f}
-.hero video{width:100%;aspect-ratio:20/13;background:#000}
-.hero video::cue{font-size:.89em;background-color:#000e}
+.hero video{width:100%;aspect-ratio:4/3;background:#000}
+.hero video::cue{font-size:clamp(12px,2.8vh,26px);background-color:#000e}
+.hero video[data-caption-companion]:not(:fullscreen)::cue{color:transparent;background-color:transparent;text-shadow:none}
+.hero video[data-caption-companion]:not(:fullscreen)::-webkit-media-text-track-container{visibility:hidden}
+.hero video[data-caption-companion]:-webkit-full-screen::cue{color:white;background-color:#000e}
 .film{margin:0;border:1px solid #393143;background:#07050b;border-radius:9px;overflow:hidden}
+.film-caption{min-block-size:calc(4.2em + 22px);margin:0;padding:11px 15px;background:#17121f;color:#f5efff;font-size:.92rem;line-height:1.4}
+@media(max-width:480px){.film-caption{min-block-size:calc(5.6em + 22px)}}
 .film figcaption{padding:9px 13px;color:var(--dark-muted);font-size:.88rem}
 .chapter-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .chapter-row button{color:#e2d8f4;background:transparent;border:1px solid #50455f;border-radius:5px;padding:5px 9px;font-size:.84rem}
