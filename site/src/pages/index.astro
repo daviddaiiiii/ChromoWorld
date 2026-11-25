@@ -94,7 +94,7 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
   film.addEventListener('error', () => {
     // The browser handles unsupported sources before playback. Recover if a
     // selected WebM fails later, retaining the chapter and playback intent.
-    if (!film.currentSrc.endsWith('.webm') || film.getAttribute('src')) {
+    if (!film.currentSrc || !new URL(film.currentSrc).pathname.endsWith('.webm') || film.getAttribute('src')) {
       filmError.hidden = false;
       return;
     }
