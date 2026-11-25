@@ -84,7 +84,7 @@ the markers in the paper's chromosome order. To regenerate those assets,
 extract the original raster layers with `pdfimages -png FIG5 FIG5_RASTERS/fig5`
 and the vector markers with `pdftocairo -svg FIG5 FIG5.svg`.
 
-Run `python scripts/make_intro.py` with Pillow, NumPy, OpenCV and imageio-ffmpeg
+Run `python scripts/make_intro.py` with Pillow, NumPy and imageio-ffmpeg
 installed. This writes the video and poster using the microscopy exports
 and the saved Fig. 4 and Fig. 5 embeddings in the sibling
 `release/Artifacts` directory. The morphology example in `src/data/overview`
@@ -95,9 +95,8 @@ atlas uses the original Fig. 5D object and the instance count from Lifted2D.
 The tracking, ChromoLift and ChromoID shots share the Fig. 5f movie and
 tracked instance recorded in `src/data/overview/fig5-live/source.json`.
 The fixed strip above the film highlights the current part of the story.
-The time-lapse scenes interpolate display frames using optical flow. Paired
-DNA and mask panels share the same motion field. The acquired frames and
-source segmentations are preserved.
+Time-lapse scenes play the acquired frames in order with a fixed hold per
+frame. Paired DNA and mask panels advance together from the same acquisition.
 
 `src/data/overview/patient-source.json` records the patient sequence and
 its frame matches to the paper presentation. The patient scene uses the

@@ -8,7 +8,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-import cv2
 import imageio_ffmpeg
 import numpy as np
 from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageEnhance, ImageFilter, ImageFont
@@ -178,40 +177,10 @@ def live(case, t, layer, width):
     return picture(SOURCE / f"live/{case}/{t}-{layer}.webp", width)
 
 
-@lru_cache(maxsize=4)
-def pixel_grid(width):
-    return np.stack(np.meshgrid(np.arange(width,dtype=np.float32),
-                                np.arange(width,dtype=np.float32)),axis=-1)
-
-
-def sequence_frame(frame, indices, layer_path, width, motion_path=None):
-    """Render an in-between display frame, with exact acquired images at the knots."""
-    index = min(int(frame),len(indices)-1)
-    fraction = float(frame - index)
-    start = indices[index]
-    first = picture(layer_path(start),width)
-    if fraction < 1e-6 or index == len(indices)-1:
-        return first
-    end = indices[index+1]
-    second = picture(layer_path(end),width)
-    reference = motion_path or layer_path
-    forward, backward = sequence_flow(reference(start),reference(end))
-    grid = pixel_grid(width)
-
-    def warp(image, vectors, amount):
-        fields = cv2.resize(vectors,(width,width),interpolation=cv2.INTER_LINEAR)
-        coords = grid-fields*(width/vectors.shape[0])*amount
-        return Image.fromarray(cv2.remap(np.asarray(image),coords,None,cv2.INTER_LINEAR))
-
-    return blend(warp(first,forward,fraction),warp(second,backward,1-fraction),fraction)
-
-
-@lru_cache(maxsize=64)
-def sequence_flow(first, second):
-    a = np.asarray(picture(first,256).convert("L"))
-    b = np.asarray(picture(second,256).convert("L"))
-    flow = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
-    return flow.calc(a,b,None), flow.calc(b,a,None)
+def acquisition_at(t, acquisitions, hold_frames):
+    """Repeat each acquired image for a fixed number of output frames."""
+    step = max(0, round(t*FPS)) // hold_frames
+    return acquisitions[min(step, len(acquisitions)-1)]
 
 
 def fish(layer, width):
@@ -638,12 +607,6 @@ def fig5_layer(time,layer,width):
     return picture(SOURCE/f"fig5-live/{time}-{layer}.webp",width)
 
 
-def tracking_view(position, layer, width):
-    return sequence_frame(position, fig5_frames(),
-                          lambda time: SOURCE/f"fig5-live/{time}-{layer}.webp",width,
-                          lambda time: SOURCE/f"fig5-live/{time}-dna.webp")
-
-
 def pose_comparison(t):
     im = shot("ChromoPose / Supplementary Fig. S2c", "The same frame, three segmentations")
     methods = (
@@ -736,21 +699,12 @@ def pose_design(t):
 
 def segmentation(t):
     im=shot("ChromoPose / tracking","Follow the same chromosome")
-    frames=fig5_frames()
-    frame=mix(0,len(frames)-1,clamp((t-.38)/8.0))
-    split=camera(t,.35,2.15)
-    focus=ramp(t,2.7,3.72)
-    x=mix(640,328,split)
-    width=round(mix(478,463,split))
-    paste(im,tracking_view(frame,"dna",width),(x,377))
-    appear = ramp(t,1.5,2.7)
-    if appear:
-        mask=tracking_view(frame,"mask",463)
-        target=tracking_view(frame,"track",463)
-        paste(im,light(blend(mask,target,focus),appear),(952,377))
-    label(im,x,590,"Live DNA projection")
-    label(im,952,590,"Tracked 3D instances",appear)
-    caption(im,"The blue instance is linked across acquired frames. Playback is interpolated between frames.")
+    frame=acquisition_at(t-.625,fig5_frames(),16)
+    paste(im,fig5_layer(frame,"dna",463),(328,377))
+    paste(im,fig5_layer(frame,"track",463),(952,377))
+    label(im,328,590,"Live DNA projection")
+    label(im,952,590,"Tracked 3D instances")
+    caption(im,"The blue instance is tracked across consecutive acquisition frames.")
     return im
 
 
@@ -842,16 +796,10 @@ def atlas_and_match(t):
 
 def live_identity(t, case="chr18"):
     im=shot("ChromoPhy / fluorescence comparison","Compare candidates with fluorescence")
-    p=ramp(t,1.05,2.58)
     indices=range(2 if case=="chr3" else 1,8)
-    frame=min(len(indices)-1,t*.76)
-    def view(layer):
-        return sequence_frame(frame,indices,lambda time: SOURCE/f"live/{case}/{time}-{layer}.webp",
-                              451,lambda time: SOURCE/f"live/{case}/{time}-dna.webp")
-    paste(im,view("candidates"),(329,379))
-    dna=view("dna")
-    tag=view("dna-tag")
-    paste(im,blend(dna,tag,p),(951,379))
+    frame=acquisition_at(t,indices,26 if case=="chr18" else 28)
+    paste(im,live(case,frame,"candidates",451),(329,379))
+    paste(im,live(case,frame,"dna-tag",451),(951,379))
     line(im,(640,174),(640,547),HIRULE)
     label(im,329,588,f"Chr{case[3:]} candidates")
     label(im,951,588,"Live DNA and fluorescence")
@@ -861,14 +809,12 @@ def live_identity(t, case="chr18"):
 
 def patient_division(t):
     im=shot("Patient-derived tumor cells","An unequal split of chromosome 14")
-    frame=min(9,t*1.13)
-    p=ramp(t,.6,2.4)
-    source=sequence_frame(frame,range(10),lambda time: SOURCE/f"patient-{time}.webp",672)
+    frame=acquisition_at(t,range(10),21)
+    source=picture(SOURCE/f"patient-{frame}.webp")
     scale=source.width/420
     crop=tuple(round(v*scale) for v in (43,45,363,375))
     image=source.crop(crop)
-    size=round(mix(421,471,camera(t,1.,6.5)))
-    image=blend(image.convert("L").convert("RGB"),image,p)
+    size=471
     width=round(size*image.width/image.height)
     paste(im,image.resize((width,size),Image.Resampling.LANCZOS),(640,382))
     reveal=ramp(t,8.4,9.72)
@@ -1067,9 +1013,8 @@ def karyotype_open(t):
 
 def living_question(t):
     im = shot("Live mitosis", "Where do the chromosomes go at division?")
-    frame = mix(0,17,camera(t,.15,7.8))
-    paste(im,sequence_frame(frame,range(1,19),lambda time: SOURCE/f"live/mitosis/{time}-dna.webp",482),
-          (640,365))
+    frame = acquisition_at(t,range(19),12)
+    paste(im,live("mitosis",frame,"dna",482),(640,365))
     p = ramp(t, 5.2, 6.3)
     label(im, 640, 595, "DNA fluorescence during mitosis", p, WHITE, 27)
     caption(im, "The DNA signal reveals movement. Following each chromosome also requires an identity.")
