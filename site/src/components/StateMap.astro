@@ -2,36 +2,49 @@
 import maps from '../data/state-maps.json';
 import palette from '../data/palette.json';
 type Key = keyof typeof maps;
-const { map, title, description, id } = Astro.props as {map:Key; title:string; description:string; id?:string};
+const {map, title, description, id} = Astro.props as {map:Key|'overlay'; title:string; description:string; id?:string};
+const overlay = map === 'overlay';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const order = [...Array.from({length:12},(_,i)=>String(i+1)), 'X', ...Array.from({length:10},(_,i)=>String(i+13)), 'Y'];
-const centers:Record<string,number[]> = maps[map];
-const colors:Record<string,string> = palette;
-const points = order.map(c => {
-  const [x,y,n] = centers[c];
-  return {id:c, x:32+300*x, y:11+300*y, n, color:colors[c]};
+const names = {banding:'G-banding', fish:'FISH', live:'Live cells'};
+const keys:Key[] = overlay ? ['banding','fish','live'] : [map as Key];
+const layers = keys.map(key=>{
+  const data=maps[key];
+  const [a,b,c,d,e,f]=overlay ? data.overlay : data.single;
+  const centers:Record<string,number[]>=data.centers;
+  const colors:Record<string,string>=palette;
+  const points=order.map(chr=>{
+    const [u,v,n]=centers[chr];
+    return {chr, x:30+300*(a*u+c*v+e), y:10+300*(b*u+d*v+f), n, color:colors[chr]};
+  });
+  return {key, matrix:[a,b,c,d,e,f].join(' '), points, line:points.map(p=>p.x+','+p.y).join(' ')};
 });
 ---
-<figure id={id} class="state-map" data-map={map}>
+<figure id={id} class:list={['state-map',{'overlay-map':overlay}]} data-map={map}>
   <figcaption><h3>{title}</h3><p>{description}</p></figcaption>
-  <svg viewBox="0 0 360 345" role="group" aria-label={title+' UMAP and chromosome-class centroids'}>
-    <image class="state-cloud" href={base+'/assets/state-maps/'+map+'.webp'} x="32" y="11" width="300" height="300" />
-    <path d="M29 21V316H335" class="map-axes" />
-    <text x="333" y="335" text-anchor="end" class="axis-label">UMAP 1</text>
-    <text transform="translate(17 55) rotate(-90)" text-anchor="middle" class="axis-label">UMAP 2</text>
-    <g class="state-centers">
-      <polyline class="center-path" points={points.map(p=>p.x+','+p.y).join(' ')} />
-      {points.map(p=>
-        <g data-class={p.id} data-count={p.n} aria-label={'Chromosome '+p.id} class="map-marker">
-          <title>{'Chr'+p.id+(p.n?' · '+p.n.toLocaleString('en-US')+' instances':' · inferred identity')}</title>
-          <circle cx={p.x} cy={p.y} r="7" fill="transparent" />
-          <circle class="center-dot" cx={p.x} cy={p.y} r="3.8" fill={p.color} />
-        </g>
-      )}
-      <g class="chosen-marker" visibility="hidden" pointer-events="none">
-        <circle r="8" fill="none" stroke="white" stroke-width="1.8" />
-        <text x="12" y="-8" class="chosen-label"></text>
-      </g>
-    </g>
+  {overlay && <fieldset class="layer-controls"><legend class="visually-hidden">Visible states</legend>
+    {keys.map(key=><label><input type="checkbox" data-state-toggle={key} checked />
+      <span aria-hidden="true" class={'line-sample '+key}></span>{names[key]}</label>)}
+  </fieldset>}
+  <svg viewBox="0 0 360 330" role="group" aria-label={title+' UMAP and chromosome-class centroids'}>
+    {layers.map(({key,matrix})=>
+      <svg x="30" y="10" width="300" height="300" viewBox="0 0 1 1" data-state={key} class="cloud-layer">
+        <image class="state-cloud" transform={'matrix('+matrix+')'} href={base+'/assets/state-maps/'+key+'.webp'} width="1" height="1" />
+      </svg>)}
+    {layers.map(({key,points,line})=>
+      <g data-state={key} class={'state-centers '+key}>
+        <polyline class="center-path" points={line} />
+        {points.map(p=>
+          <g data-class={p.chr} aria-label={names[key]+' chromosome '+p.chr} class="map-marker">
+            <title>{names[key]+' · Chr'+p.chr+(p.n?' · '+p.n.toLocaleString('en-US')+' instances':' · inferred identity')}</title>
+            <circle cx={p.x} cy={p.y} r="5" fill="transparent" />
+            {overlay && key==='fish' ? <rect x={p.x-2.2} y={p.y-2.2} width="4.4" height="4.4" fill={p.color} class="center-dot" /> :
+             overlay && key==='live' ? <path d={`M${p.x} ${p.y-3.2}l3 5.4h-6Z`} fill={p.color} class="center-dot" /> :
+             <circle cx={p.x} cy={p.y} r={overlay?2.7:3.7} fill={p.color} class="center-dot" />}
+            <circle cx={p.x} cy={p.y} r="7" class="selection-ring" />
+            {!overlay && <text x={p.x+(p.chr==='Y'?-7:7)} y={p.y-9} text-anchor={p.chr==='Y'?'end':'start'}
+              class:list={['point-label',{'endpoint':p.chr==='1'||p.chr==='Y'}]}>{'Chr'+p.chr}</text>}
+          </g>)}
+      </g>)}
   </svg>
 </figure>

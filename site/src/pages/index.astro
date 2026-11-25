@@ -12,7 +12,7 @@ const explorers = [
     alt:'A DNA projection next to color-coded tracked chromosomes',
     description:'Follow a division frame by frame, or compare how three models separate the same chromosomes.',
     links:[['Explore tracks',`/live-4d/?sample=${feature.sample}&t=${feature.time}&view=front`],['Compare methods','/live-4d/compare/']] },
-  { category:'Morphology', title:'Identity across states', img:'shape-preview.webp?v=2',
+  { category:'Morphology', title:'Identity across states', img:'shape-preview.webp?v=3',
     alt:'UMAP clouds and chromosome-class centroids in G-banding, FISH and live cells',
     description:'Locate the same chromosome class in G-banding, FISH and live cells using UMAP and class centroids.',
     links:[['Explore the maps','/identity-flow/']] },
@@ -34,12 +34,12 @@ const chapters = [[0,'Karyotype'],[22,'Full pipeline'],[43,'Banding to FISH'],[7
       <div class="hero-film">
         <figure class="film">
           <video id="intro" controls playsinline preload="metadata" poster={asset('intro-poster.webp?v=14')} aria-label="A Karyotype in Motion">
-            <source src={asset('intro-stream.webm')} type='video/webm; codecs="vp9, opus"' />
-            <source src={asset('intro.mp4?v=14')} type="video/mp4" />
+            <source src={asset('intro-stream.webm?v=15')} type='video/webm; codecs="vp9, opus"' />
+            <source src={asset('intro.mp4?v=15')} type="video/mp4" />
             <track kind="captions" srclang="en" label="English" src={asset('intro-en.vtt?v=13')} />
             <track kind="subtitles" srclang="zh-Hans" label="简体中文" src={asset('intro-zh.vtt?v=13')} />
           </video>
-          <figcaption><strong>A Karyotype in Motion</strong><span class="film-formats"><a id="intro-hd" href={asset('intro.mp4?v=14')}>Open HD MP4</a><span>5:38</span></span></figcaption>
+          <figcaption><strong>A Karyotype in Motion</strong><span class="film-formats"><a id="intro-hd" href={asset('intro.mp4?v=15')}>Open HD MP4</a><span>5:38</span></span></figcaption>
         </figure>
         <p id="film-error" class="film-credit" role="status" hidden>Video unavailable here. <a href="https://github.com/daviddaiiiii/ChromoWorld/blob/main/site/public/assets/intro.mp4">Get the film on GitHub</a>.</p>
         <details class="film-chapters">

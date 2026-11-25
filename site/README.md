@@ -44,10 +44,12 @@ Run `python scripts/prepare_state_maps.py ../Artifacts PATH_TO_FIGURE_EXPORTS`
 from the site directory to regenerate the UMAP clouds, normalized centroids and
 homepage preview. Fixed-cell maps use every saved Fig. 4 coordinate. The main
 live-cell map uses the Fig. 5E cloud and vector centroids exported by
-`prepare_intro_story.py`. The supplementary Lifted MIP view plots
-`lifted_opt_mip_embedding` from `LiftedMIP_umap_embed.npz` and calculates each
-center from the entries with the same `lifted_opt_mip_y` label. The published
-ChromoPhy assignments appear in the main live-cell panel at `#chromophy`.
+`prepare_intro_story.py`. The individual views rotate the Chr1-to-ChrY vector
+onto the positive horizontal axis. The overlay at `#aligned` fits one proper
+rotation and translation per state to the 24 G-banding class centroids, with
+equal weight per class. The fit uses the normalized square coordinates of the
+three source plots. All layers share a single display zoom. Each cloud and its
+centroids use the same transform. Live assignments are inferred by ChromoID.
 
 ## Homepage film
 
@@ -55,8 +57,9 @@ The player first offers a 960 × 624 VP9/Opus WebM for streaming. The original
 1280 × 832 H.264/AAC MP4 is available through the same player and the HD link.
 Both use the same chapters and bilingual captions.
 
-The opening karyotype is arranged from a single held-out, reference-annotated
-G-banding field. `scripts/prepare_intro_story.py` extracts it and the Fig. 2/5
+The opening karyotype uses the held-out G-banding field `Banding_04301`.
+Its reference annotations contain two copies of autosomes 1–22, one X and one Y.
+`scripts/prepare_intro_story.py` extracts it and the Fig. 2/5
 comparison panels from the original local datasets and figure exports. The
 fixed-cell chapter shows the Fig. 2A preparation schematics, the Fig. 2B
 metrics and the top row of Fig. 2D, where all three models train on G-banding

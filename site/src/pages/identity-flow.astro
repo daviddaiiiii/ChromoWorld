@@ -7,7 +7,7 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
   <section class="shell page-head">
     <p class="eyebrow">Chromosome morphology</p>
     <h1>Identity across states</h1>
-    <p class="lead">Where does the same chromosome class sit in G-banding, FISH and live cells? Compare its center against the full distribution of shapes in each state.</p>
+    <p class="lead">Follow a chromosome class from G-banding and FISH to dividing cells.</p>
   </section>
   <section class="shell" id="shape-view" aria-label="Cross-state UMAP explorer">
     <div class="controls map-controls">
@@ -18,25 +18,12 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
     <div class="state-triptych">
       <StateMap map="banding" title="G-banding" description="Fixed cells · banded chromosomes" />
       <StateMap map="fish" title="FISH" description="Fixed cells · probe-labeled preparations" />
-      <StateMap id="chromophy" map="live" title="Live cells · ChromoPhy" description="Fig. 5E · ChromoID assigns identities to measured 3D shapes" />
+      <StateMap id="chromophy" map="live" title="Live cells · ChromoPhy" description="Fig. 5E · ChromoID assignments in 3D" />
     </div>
-    <p class="map-readout" id="shape-note" aria-live="polite">Select a class or click a centroid to locate it in all three states.</p>
-    <p class="scientific-note">Each cloud shows chromosome instances. The line joins class centers in the paper’s chromosome order. Each state has its own UMAP axes. The fixed-cell maps include annotations and predictions (Fig. 4). Live colors show inferred identities (Fig. 5E).</p>
-    <details class="other-spaces">
-      <summary>Additional maps from the embedding archive</summary>
-      <div class="controls map-controls"><label for="live-mode">Live-cell features</label>
-        <select class="control" id="live-mode">
-          <option value="naive">Direct projection</option><option value="geometry">3D morphology</option><option value="lifted">Lifted MIP features</option>
-        </select>
-      </div>
-      <div class="state-triptych alternate-maps">
-        <StateMap map="joint" title="G-banding + FISH" description="Joint fixed-cell UMAP" />
-        <StateMap map="naive" title="Projected morphology" description="Live-cell DNA projection" />
-        <div hidden data-alternate="geometry"><StateMap map="geometry" title="3D morphology" description="Measured live-cell descriptors" /></div>
-        <div hidden data-alternate="lifted"><StateMap map="lifted" title="Lifted MIP features" description="Archived projection UMAP · centers grouped by archived class labels" /></div>
-      </div>
-      <p><a href="#chromophy">View the ChromoPhy identity assignments in Fig. 5E ↑</a></p>
-    </details>
+    <p class="scientific-note">Each UMAP is rotated to place Chr1 on the left and ChrY on the right. Colors identify chromosome classes. Lines join class centers in the order used in the paper.</p>
+    <StateMap id="aligned" map="overlay" title="Three states, aligned" description="All 24 class centers guide the rigid alignment to G-banding." />
+    <p class="scientific-note">The overlay uses rotation and translation in normalized plot coordinates. Distances within each map are preserved. Toggle a layer to compare the remaining two.</p>
+    <p class="map-readout" id="shape-note" aria-live="polite">Select a chromosome class to highlight its center in every view.</p>
   </section>
 </Base>
 <script>
@@ -44,30 +31,21 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
   const picker=root.querySelector<HTMLSelectElement>('#shape-chr')!;
   const toggle=root.querySelector<HTMLInputElement>('#centroid-toggle')!;
   const note=root.querySelector<HTMLElement>('#shape-note')!;
-  const figures=[...root.querySelectorAll<HTMLElement>('[data-map]')];
   function update(){
-    const id=picker.value;
+    const chr=picker.value;
     root.classList.toggle('cloud-only',!toggle.checked);
-    for (const chart of figures) {
-      chart.classList.toggle('has-selection',Boolean(id)&&toggle.checked);
-      const markers=[...chart.querySelectorAll<SVGGElement>('.map-marker')];
-      const chosen=chart.querySelector<SVGGElement>('.chosen-marker')!;
-      const match=markers.find(m=>m.dataset.class===id);
-      for(const marker of markers) marker.classList.toggle('selected',marker===match);
-      chosen.setAttribute('visibility',match?'visible':'hidden');
-      if(match){
-        const dot=match.querySelector('.center-dot')!;
-        chosen.setAttribute('transform',`translate(${dot.getAttribute('cx')} ${dot.getAttribute('cy')})`);
-        chosen.querySelector('text')!.textContent='Chr'+id;
-      }
+    root.classList.toggle('has-selection',Boolean(chr));
+    for(const marker of root.querySelectorAll<SVGGElement>('.map-marker')){
+      marker.classList.toggle('selected',marker.dataset.class===chr);
     }
-    note.textContent = !toggle.checked ? 'Showing the full UMAP distributions.' : id ?
-      'Chr'+id+' is highlighted in G-banding, FISH and live cells.' : 'Select a class or click a centroid to locate it in all three states.';
+    note.textContent = !toggle.checked ? 'Showing the full UMAP distributions.' : chr ?
+      'Chr'+chr+' is highlighted in every visible state.' : 'Select a chromosome class to highlight its center in every view.';
   }
-  function choose(id:string){
-    picker.value=id; if(id) toggle.checked=true;
+  function choose(chr:string){
+    picker.value=chr;
+    if(chr) toggle.checked=true;
     const url=new URL(location.href);
-    if(id) url.searchParams.set('chr',id);else url.searchParams.delete('chr');
+    if(chr) url.searchParams.set('chr',chr); else url.searchParams.delete('chr');
     history.replaceState(null,'',url);
     update();
   }
@@ -79,40 +57,51 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
     const marker=(e.target as Element).closest<SVGGElement>('.map-marker');
     if(marker?.dataset.class) choose(marker.dataset.class);
   });
-  const liveMode=root.querySelector<HTMLSelectElement>('#live-mode')!;
-  liveMode.addEventListener('change',()=>{
-    root.querySelector<HTMLElement>('[data-map="naive"]')!.hidden=liveMode.value!=='naive';
-    for(const el of root.querySelectorAll<HTMLElement>('[data-alternate]')) el.hidden=el.dataset.alternate!==liveMode.value;
-  });
+  const aligned=root.querySelector<HTMLElement>('#aligned')!;
+  for(const input of aligned.querySelectorAll<HTMLInputElement>('[data-state-toggle]')){
+    input.addEventListener('change',()=>{
+      for(const layer of aligned.querySelectorAll<SVGElement>('[data-state]')){
+        if(layer.dataset.state===input.dataset.stateToggle) layer.classList.toggle('layer-off',!input.checked);
+      }
+    });
+  }
   update();
 </script>
 <style is:global>
   #shape-view{padding-bottom:54px}
   .map-controls{margin:0 0 16px;align-items:center}
   .center-toggle{display:flex;align-items:center;gap:7px;margin-left:auto;cursor:pointer}
-  .center-toggle input{accent-color:var(--accent)}
+  #shape-view input{accent-color:var(--accent)}
   .state-triptych{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;border-radius:12px;overflow:hidden;background:#303036}
   .state-map{margin:0;background:black;color:white;min-width:0}
-  #chromophy{scroll-margin-top:76px}
+  #chromophy,#aligned{scroll-margin-top:76px}
   .state-map figcaption{padding:18px 20px 0}
   .state-map h3{font-size:1.18rem;margin:0 0 4px;color:#f4f4f8}
   .state-map figcaption p{margin:0;font-size:.87rem;color:#bfbfc8}
-  .state-map svg{display:block;width:100%}
-  .map-axes{fill:none;stroke:#54545f}.axis-label{fill:#bebec9;font-size:12px}
-  .state-cloud{opacity:.56}.cloud-only .state-cloud{opacity:1}
+  .state-map > svg{display:block;width:100%}
+  .state-cloud{opacity:.6}.cloud-only .state-cloud{opacity:1}
   .center-path{fill:none;stroke:#e3e1ec;stroke-width:1.4;stroke-linejoin:round}
-  .map-marker{cursor:pointer}.center-dot{stroke:#f3f2f5;stroke-width:.8}
-  .map-marker:hover .center-dot{stroke-width:2}
-  .chosen-label{fill:white;stroke:#080808;stroke-width:3px;paint-order:stroke;font-weight:650;font-size:14px}
-  .has-selection .map-marker:not(.selected){opacity:.36}.has-selection .center-path{opacity:.52}
-  .cloud-only .state-centers{display:none}
-  .map-readout{margin:12px 0 5px;font-weight:600}
-  .other-spaces{margin-top:32px;border-top:1px solid var(--line)}
-  .other-spaces summary{cursor:pointer;padding:14px 0;font-weight:650}
-  .alternate-maps{grid-template-columns:repeat(2,minmax(0,1fr));max-width:880px}
+  .map-marker{cursor:pointer}.center-dot{stroke:#f3f2f5;stroke-width:.7}
+  .selection-ring{display:none;fill:none;stroke:white;stroke-width:1.7;pointer-events:none}
+  .point-label{display:none;fill:white;stroke:#080808;stroke-width:2.4px;paint-order:stroke;font-size:12px;font-weight:650;pointer-events:none}
+  .map-marker.selected .point-label,.map-marker.selected .selection-ring,#shape-view:not(.has-selection) .endpoint{display:block}
+  .has-selection .map-marker:not(.selected){opacity:.35}.has-selection .center-path{opacity:.55}
+  .cloud-only .state-centers,#shape-view .layer-off{display:none}
+  .map-readout{font-weight:600}
+  .overlay-map{border-radius:12px;overflow:hidden;margin-top:28px;position:relative}
+  .overlay-map > svg{width:min(100%,620px);margin:auto}
+  .overlay-map .cloud-layer{mix-blend-mode:screen}
+  .overlay-map .state-cloud{opacity:.36}.cloud-only .overlay-map .state-cloud{opacity:.6}
+  .overlay-map .center-path{stroke-width:.9}
+  .overlay-map .fish .center-path,.line-sample.fish{stroke-dasharray:5 3;border-top-style:dashed}
+  .overlay-map .live .center-path,.line-sample.live{stroke-dasharray:1 2.5;stroke-linecap:round;border-top-style:dotted}
+  .layer-controls{display:flex;gap:8px 18px;flex-wrap:wrap;border:0;margin:12px 20px 0;padding:0}
+  .layer-controls label{display:inline-flex;gap:6px;align-items:center;color:white;font-size:.85rem;cursor:pointer}
+  .line-sample{width:16px;border-top:2px solid currentColor}
+  .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
   @media(max-width:680px){
-    .state-triptych,.alternate-maps{grid-template-columns:1fr}
-    .state-map{width:100%}.state-map svg{max-height:350px}
+    .state-triptych{grid-template-columns:1fr}
+    .state-map{width:100%}.state-triptych .state-map > svg{max-height:350px}
     .center-toggle{margin-left:0}
   }
 </style>

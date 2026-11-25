@@ -998,7 +998,7 @@ def karyotype_open(t):
         y = 213+i*113
         text(im, (849, y), title, 34, tone(WHITE, q), True)
         text(im, (850, y+46), detail, 25, tone(MUTED, q))
-    caption(im, "G-banded metaphase, arranged by reference chromosome annotations.")
+    caption(im, "46,XY · G-banded metaphase arranged by reference chromosome annotations.")
     return im
 
 

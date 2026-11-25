@@ -9,6 +9,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
 
+OPENING_SPREAD = "Banding_04301"
+
 
 def save(image, directory, name):
     image.save(directory / (name + ".webp"), "WEBP", lossless=True)
@@ -33,6 +35,11 @@ def chromosome_cutout(image, points):
 def karyotype(test, specimen, dest):
     with Image.open(test / "image" / f"{specimen}.png") as source:
         img = source.convert("L")
+    # Apply one display window to the whole field so band contrast is comparable.
+    low, high = np.percentile(np.asarray(img), [1, 99.95])
+    if high <= low:
+        raise ValueError("The opening G-banding field has no usable intensity range")
+    img = img.point(np.clip((np.arange(256)-low)*255/(high-low), 0, 255).round().tolist())
     chromosomes = {i: [] for i in range(24)}
     for row in (test / "label/Banding" / f"{specimen}.txt").read_text().splitlines():
         cls, *coords = row.split()
@@ -40,8 +47,8 @@ def karyotype(test, specimen, dest):
         if cls in chromosomes:
             points = np.array([float(x) for x in coords]).reshape(-1, 2)
             chromosomes[cls].append(chromosome_cutout(img, points))
-    if any(len(chromosomes[i]) != 2 for i in range(23)) or chromosomes[23]:
-        raise ValueError("This demonstration expects a complete reference-annotated XX spread")
+    if any(len(chromosomes[i]) != (2 if i < 22 else 1) for i in range(24)):
+        raise ValueError("The opening requires 22 autosome pairs, one X and one Y in the same spread")
 
     board = Image.new("RGB", (1368, 860), "black")
     d = ImageDraw.Draw(board)
@@ -52,7 +59,8 @@ def karyotype(test, specimen, dest):
         x, y = 88 + (i % 8) * 170, 18 + (i // 8) * 280
         for j, tile in enumerate(pairs):
             tile = tile.resize(tuple(max(1, round(v * scale)) for v in tile.size), Image.Resampling.LANCZOS)
-            board.paste(tile, (x + 70*j - 36 - tile.width//2, y + 108 - tile.height//2))
+            offset = (j - (len(pairs)-1)/2) * 70
+            board.paste(tile, (round(x + offset) - tile.width//2, y + 108 - tile.height//2))
         d.text((x, y + 232), str(i+1) if i<22 else "XY"[i-22], font=font, fill="#b4b4bd", anchor="mm")
     save(board, dest, "karyotype")
     for i, tile in enumerate(chromosomes[0]):
@@ -233,7 +241,7 @@ def main():
                         help="Raster export of the full Supplementary Fig. S2 plate")
     args = parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True)
-    karyotype(args.dataset,"Banding_05535",args.output)
+    karyotype(args.dataset,OPENING_SPREAD,args.output)
     fig2_panels(args.fig2_figure,args.output)
     fig3_panels(args.fig3_figure,args.output)
     fig3_perturbation_bars(args.fig3_chart_archive,args.output)
@@ -241,7 +249,7 @@ def main():
     fig5_identity_panels(args.fig5_map_rasters,args.fig5_vectors,args.output)
     pose_panels(args.pose_figure,args.output)
     (args.output/"sources.json").write_text(json.dumps({
-        "karyotype":"Dataset/2D held-out G-banding, Banding_05535; arranged by the reference annotations",
+        "karyotype":f"Dataset/2D held-out G-banding, {OPENING_SPREAD}; 46,XY by reference annotations",
         "preparation_states":"Fig. 2A dehydrated and rehydrated chromosome schematics",
         "banding_only":"Fig. 2D top row: Mask R-CNN, YOLOv11-Seg and YOLOv12-Seg on the same held-out FISH field (id01_HFF_FISH_00023)",
         "projection":"Archival Fig. 5A/B image panels from the presentation",

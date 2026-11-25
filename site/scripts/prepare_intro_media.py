@@ -13,7 +13,7 @@ from PIL import Image, ImageColor, ImageDraw, ImageFilter
 from scipy import ndimage as ndi
 import tifffile as tf
 
-from prepare_intro_story import (fig2_panels, fig3_panels, fig3_perturbation_bars,
+from prepare_intro_story import (OPENING_SPREAD, fig2_panels, fig3_panels, fig3_perturbation_bars,
                                  fig5_identity_panels, fig5_panels, karyotype,
                                  save, white_to_black)
 from prepare_live_comparison import palette
@@ -82,9 +82,9 @@ def fixed_layers(args):
             with Image.open(BytesIO(data.read(member))) as image:
                 return image.convert("L")
 
-        for member in ("2D/test/image/Banding_05535.png","2D/test/label/Banding/Banding_05535.txt"):
+        for member in (f"2D/test/image/{OPENING_SPREAD}.png",f"2D/test/label/Banding/{OPENING_SPREAD}.txt"):
             data.extract(member,args.figures)
-        karyotype(args.figures/"2D/test","Banding_05535",out/"story")
+        karyotype(args.figures/"2D/test",OPENING_SPREAD,out/"story")
         banding = photo("2D/test/image/Banding_04301.png")
         annotation = data.read("2D/test/label/Banding/Banding_04301.txt").decode()
         save(banding_thumbnail(banding,annotation),out,"banding-dna")
