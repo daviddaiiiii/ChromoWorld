@@ -44,7 +44,10 @@ Run `python scripts/prepare_state_maps.py ../Artifacts PATH_TO_FIGURE_EXPORTS`
 from the site directory to regenerate the UMAP clouds, normalized centroids and
 homepage preview. Fixed-cell maps use every saved Fig. 4 coordinate. The main
 live-cell map uses the Fig. 5E cloud and vector centroids exported by
-`prepare_intro_story.py`. Each panel preserves its original geometry.
+`prepare_intro_story.py`. The supplementary Lifted MIP view plots
+`lifted_opt_mip_embedding` from `LiftedMIP_umap_embed.npz` and calculates each
+center from the entries with the same `lifted_opt_mip_y` label. The published
+ChromoPhy assignments appear in the main live-cell panel at `#chromophy`.
 
 ## Homepage film
 

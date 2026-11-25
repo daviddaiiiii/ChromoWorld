@@ -2,7 +2,7 @@
 import maps from '../data/state-maps.json';
 import palette from '../data/palette.json';
 type Key = keyof typeof maps;
-const { map, title, description } = Astro.props as {map:Key; title:string; description:string};
+const { map, title, description, id } = Astro.props as {map:Key; title:string; description:string; id?:string};
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const order = [...Array.from({length:12},(_,i)=>String(i+1)), 'X', ...Array.from({length:10},(_,i)=>String(i+13)), 'Y'];
 const centers:Record<string,number[]> = maps[map];
@@ -12,7 +12,7 @@ const points = order.map(c => {
   return {id:c, x:32+300*x, y:11+300*y, n, color:colors[c]};
 });
 ---
-<figure class="state-map" data-map={map}>
+<figure id={id} class="state-map" data-map={map}>
   <figcaption><h3>{title}</h3><p>{description}</p></figcaption>
   <svg viewBox="0 0 360 345" role="group" aria-label={title+' UMAP and chromosome-class centroids'}>
     <image class="state-cloud" href={base+'/assets/state-maps/'+map+'.webp'} x="32" y="11" width="300" height="300" />

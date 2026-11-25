@@ -18,23 +18,24 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
     <div class="state-triptych">
       <StateMap map="banding" title="G-banding" description="Fixed cells · banded chromosomes" />
       <StateMap map="fish" title="FISH" description="Fixed cells · probe-labeled preparations" />
-      <StateMap map="live" title="Live" description="Dividing cells · ChromoID assignments" />
+      <StateMap id="chromophy" map="live" title="Live cells · ChromoPhy" description="Fig. 5E · ChromoID assigns identities to measured 3D shapes" />
     </div>
     <p class="map-readout" id="shape-note" aria-live="polite">Select a class or click a centroid to locate it in all three states.</p>
     <p class="scientific-note">Each cloud shows chromosome instances. The line joins class centers in the paper’s chromosome order. Each state has its own UMAP axes. The fixed-cell maps include annotations and predictions (Fig. 4). Live colors show inferred identities (Fig. 5E).</p>
     <details class="other-spaces">
-      <summary>Explore the joint fixed-cell embedding and other live-cell representations</summary>
-      <div class="controls map-controls"><label for="live-mode">Live representation</label>
+      <summary>Additional maps from the embedding archive</summary>
+      <div class="controls map-controls"><label for="live-mode">Live-cell features</label>
         <select class="control" id="live-mode">
-          <option value="naive">Direct projection</option><option value="geometry">3D morphology</option><option value="lifted">Lifted projection</option>
+          <option value="naive">Direct projection</option><option value="geometry">3D morphology</option><option value="lifted">Lifted MIP features</option>
         </select>
       </div>
       <div class="state-triptych alternate-maps">
         <StateMap map="joint" title="G-banding + FISH" description="Joint fixed-cell UMAP" />
         <StateMap map="naive" title="Projected morphology" description="Live-cell DNA projection" />
         <div hidden data-alternate="geometry"><StateMap map="geometry" title="3D morphology" description="Measured live-cell descriptors" /></div>
-        <div hidden data-alternate="lifted"><StateMap map="lifted" title="Lifted projection" description="Live-cell projection after lifting" /></div>
+        <div hidden data-alternate="lifted"><StateMap map="lifted" title="Lifted MIP features" description="Archived projection UMAP · centers grouped by archived class labels" /></div>
       </div>
+      <p><a href="#chromophy">View the ChromoPhy identity assignments in Fig. 5E ↑</a></p>
     </details>
   </section>
 </Base>
@@ -92,6 +93,7 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
   .center-toggle input{accent-color:var(--accent)}
   .state-triptych{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;border-radius:12px;overflow:hidden;background:#303036}
   .state-map{margin:0;background:black;color:white;min-width:0}
+  #chromophy{scroll-margin-top:76px}
   .state-map figcaption{padding:18px 20px 0}
   .state-map h3{font-size:1.18rem;margin:0 0 4px;color:#f4f4f8}
   .state-map figcaption p{margin:0;font-size:.87rem;color:#bfbfc8}
