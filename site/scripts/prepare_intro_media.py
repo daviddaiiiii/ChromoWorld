@@ -274,6 +274,36 @@ def patient_layers(args):
             save(Image.fromarray(rgb),out,f"patient-{t}")
 
 
+def fig5_track_regions(volumes, times, info, spacing):
+    """Trace the selected target through the merged early masks."""
+    by_time = dict(zip(times, volumes))
+    regions = {t: volume==info["track_id"] for t,volume in by_time.items()}
+    repair = info.get("early_track_repair")
+    if repair is None:
+        return regions
+    neighbor = by_time[repair["anchor_t"]]==repair["neighbor_anchor_label"]
+    for frame in reversed(repair["frames"]):
+        t = frame["t"]
+        merged = by_time[t]==frame["merged_label"]
+        if not merged.any() or not regions[t+1].any() or not neighbor.any():
+            raise ValueError(f"Missing a foreground region for the Fig. 5f repair at t={t}")
+        seeds = [
+            ndi.shift(mask,frame[key],order=0,mode="constant",cval=False,prefilter=False)
+            for mask,key in ((regions[t+1],"target_shift_zyx"),(neighbor,"neighbor_shift_zyx"))
+        ]
+        roi = ndi.find_objects(merged | seeds[0] | seeds[1])[0]
+        target_dist, neighbor_dist = (
+            ndi.distance_transform_edt(~seed[roi],sampling=spacing) for seed in seeds
+        )
+        target = np.zeros_like(merged)
+        target[roi] = merged[roi] & (target_dist < neighbor_dist)
+        regions[t] = target
+        neighbor = merged & ~target
+        if not target.any() or not neighbor.any():
+            raise ValueError(f"Could not divide the merged Fig. 5f mask at t={t}")
+    return regions
+
+
 def fig5_live_layers(args):
     sys.path.insert(0,str(args.renderer))
     out = args.output/"fig5-live"
@@ -285,6 +315,8 @@ def fig5_live_layers(args):
                                               args.release/info["tracked_source_relative_to_release"])
         mips = np.stack([read_frame(raw,t).max(0) for t in times])
         volumes = [read_frame(tracked,t) for t in times]
+        regions = fig5_track_regions(volumes,times,info,spacing)
+        repaired_times = {frame["t"] for frame in info.get("early_track_repair",{}).get("frames",[])}
         y,x = np.nonzero(np.any([v.any(0) for v in volumes],axis=0))
         side = max(np.ptp(x),np.ptp(y))+24
         cx,cy = (x.min()+x.max()+1)/2,(y.min()+y.max()+1)/2
@@ -292,20 +324,36 @@ def fig5_live_layers(args):
         low,high = np.percentile(mips[:,y,x],[9,99.6])
         up = 4
         crop = tuple(v*up for v in box)
+        frame_info = []
         for t,volume,mip in zip(times,volumes,mips):
-            binary = volume==track
+            binary = regions[t]
             if not binary.any():
                 raise ValueError(f"Fig. 5f track {track} missing at t={t}")
+            active_label = track
+            if t in repaired_times:
+                active_label = int(volume.max())+1
+                volume = volume.astype(np.int32)
+                volume[binary] = active_label
             rgb,labels = render_front(volume,spacing,gray_lut(int(volume.max()),207),up)
             target,ids = render_front(binary.astype(np.uint16),spacing,np.array([[0,0,0],[180,219,251]],np.uint8),up)
-            focus = ids>0
-            overlay = np.uint8(rgb*.52)
-            overlay[ndi.binary_dilation(focus,iterations=4)&~focus] = [134,192,240]
-            overlay[focus&(labels!=track)&~ndi.binary_erosion(focus,iterations=4)] = [121,160,191]
-            overlay[labels==track] = target[labels==track]
-            save(dna_image(mip,low,high,.85,247).crop(box),out,f"{t}-dna")
+            visible = labels==active_label
+            overlay = np.uint8(rgb*.66)
+            overlay[visible] = target[visible]
+            dna = dna_image(mip,low,high,.85,247).crop(box)
+            save(dna,out,f"{t}-dna")
+            # The overlay is the XY outline of the same 3D label in this acquisition.
+            silhouette = Image.fromarray(binary.any(axis=0)).crop(box)
+            projected = np.asarray(silhouette.resize((dna.width*up,dna.height*up),Image.Resampling.NEAREST))
+            edge = ndi.binary_dilation(projected,iterations=3) ^ ndi.binary_erosion(projected,iterations=2)
+            annotated = np.array(dna.resize((dna.width*up,dna.height*up),Image.Resampling.LANCZOS).convert("RGB"))
+            annotated[edge] = (132,201,253)
+            save(Image.fromarray(annotated),out,f"{t}-dna-track")
             save(Image.fromarray(rgb).crop(crop),out,f"{t}-mask")
             save(Image.fromarray(overlay).crop(crop),out,f"{t}-track")
+            frame_info.append({
+                "t": t, "instance_voxels": int(binary.sum()),
+                "front_visible_fraction": round(np.count_nonzero(visible)/(ids>0).sum(),4),
+            })
         roi = ndi.find_objects(binary)[0]
         selected = np.pad(binary[roi].astype(np.uint16),5)
         intensity = np.pad(np.where(binary[roi],read_frame(raw,times[-1])[roi],0),5).max(0).astype(float)
@@ -315,6 +363,8 @@ def fig5_live_layers(args):
         save(Image.fromarray(rgb),args.output,"tracked-chromosome-3d")
         save(Image.fromarray(np.uint8(scaled)).resize(Image.fromarray(rgb).size,Image.Resampling.LANCZOS),
              args.output,"tracked-chromosome-projection")
+    info["frames"] = frame_info
+    (out/"source.json").write_text(json.dumps(info,indent=2)+"\n")
 
 
 def pose_live_layers(args):

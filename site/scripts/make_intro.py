@@ -700,11 +700,12 @@ def pose_design(t):
 def segmentation(t):
     im=shot("ChromoPose / tracking","Follow the same chromosome")
     frame=acquisition_at(t-.625,fig5_frames(),16)
-    paste(im,fig5_layer(frame,"dna",463),(328,377))
+    paste(im,fig5_layer(frame,"dna-track",463),(328,377))
     paste(im,fig5_layer(frame,"track",463),(952,377))
-    label(im,328,590,"Live DNA projection")
-    label(im,952,590,"Tracked 3D instances")
-    caption(im,"The blue instance is tracked across consecutive acquisition frames.")
+    text(im,(1204,42),f"FRAME {frame:02d}",19,MUTED,True,"ra")
+    label(im,328,590,"DNA · projected track outline")
+    label(im,952,590,"3D mask · visible surface")
+    caption(im,"The blue outline and surface mark the same tracked instance in each acquisition.")
     return im
 
 
@@ -732,7 +733,7 @@ def lift_training(t):
     dissolve=ramp(t,.12,.86)
     settle=camera(t,.38,2.0)
     if dissolve<1:
-        paste(im,light(fig5_layer(anchor_t,"dna",463),1-dissolve),(328,377))
+        paste(im,light(fig5_layer(anchor_t,"dna-track",463),1-dissolve),(328,377))
         paste(im,light(fig5_layer(anchor_t,"track",463),1-dissolve),(952,377))
     (anchor_x,anchor_y),anchor_width=tracking_anchor()
     body=picture(SOURCE/"tracked-chromosome-3d.webp")

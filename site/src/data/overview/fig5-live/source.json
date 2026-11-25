@@ -1,0 +1,164 @@
+{
+  "figure": "chromoworld.pptx slide 5 panel f",
+  "sample": "rpe1_60x_2_0002_561",
+  "matched_slide_image_to_frame": {
+    "153": 0,
+    "154": 4,
+    "155": 9,
+    "156": 14,
+    "157": 19,
+    "158": 18,
+    "159": 17,
+    "160": 16,
+    "152": 15
+  },
+  "coordinate_space": "native, shared with raw_pre",
+  "raw_source_relative_to_release": "image/raw_pre/tiff/others/rpe1_60x_2_0002_561-DAPI.tif",
+  "tracked_source_relative_to_release": "mask/chrp3d_post_tracked/others/rpe1_60x_2_0002_561.tif",
+  "voxel_size_zyx_um": [
+    0.433,
+    0.10800000305939465,
+    0.10800000305939465
+  ],
+  "track_id": 84,
+  "frames": [
+    {
+      "t": 4,
+      "instance_voxels": 291,
+      "front_visible_fraction": 0.9586
+    },
+    {
+      "t": 5,
+      "instance_voxels": 326,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 6,
+      "instance_voxels": 379,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 7,
+      "instance_voxels": 426,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 8,
+      "instance_voxels": 879,
+      "front_visible_fraction": 0.8813
+    },
+    {
+      "t": 9,
+      "instance_voxels": 752,
+      "front_visible_fraction": 0.8646
+    },
+    {
+      "t": 10,
+      "instance_voxels": 1477,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 11,
+      "instance_voxels": 1101,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 12,
+      "instance_voxels": 1129,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 13,
+      "instance_voxels": 1154,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 14,
+      "instance_voxels": 1059,
+      "front_visible_fraction": 1.0
+    },
+    {
+      "t": 15,
+      "instance_voxels": 1624,
+      "front_visible_fraction": 0.9979
+    }
+  ],
+  "isolated_anchor_t": 15,
+  "projection": "XY maximum intensity, from the same masked DNA volume",
+  "early_track_repair": {
+    "anchor_t": 9,
+    "neighbor_anchor_label": 77,
+    "frames": [
+      {
+        "t": 4,
+        "merged_label": 77,
+        "target_shift_zyx": [
+          0,
+          -3,
+          6
+        ],
+        "neighbor_shift_zyx": [
+          0,
+          -3,
+          6
+        ]
+      },
+      {
+        "t": 5,
+        "merged_label": 77,
+        "target_shift_zyx": [
+          0,
+          1,
+          10
+        ],
+        "neighbor_shift_zyx": [
+          0,
+          1,
+          11
+        ]
+      },
+      {
+        "t": 6,
+        "merged_label": 77,
+        "target_shift_zyx": [
+          0,
+          1,
+          -1
+        ],
+        "neighbor_shift_zyx": [
+          0,
+          1,
+          -1
+        ]
+      },
+      {
+        "t": 7,
+        "merged_label": 77,
+        "target_shift_zyx": [
+          1,
+          -5,
+          9
+        ],
+        "neighbor_shift_zyx": [
+          0,
+          -4,
+          9
+        ]
+      },
+      {
+        "t": 8,
+        "merged_label": 77,
+        "target_shift_zyx": [
+          0,
+          3,
+          -2
+        ],
+        "neighbor_shift_zyx": [
+          0,
+          4,
+          -3
+        ]
+      }
+    ]
+  }
+}

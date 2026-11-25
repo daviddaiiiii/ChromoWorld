@@ -94,6 +94,12 @@ the separately fitted G-banding and FISH maps to the joint map. The lifted
 atlas uses the original Fig. 5D object and the instance count from Lifted2D.
 The tracking, ChromoLift and ChromoID shots share the Fig. 5f movie and
 tracked instance recorded in `src/data/overview/fig5-live/source.json`.
+The film follows the original ID 84 anchor. From frames 4–8, two components
+share a segmentation label. The preparation script splits this merged
+foreground using both masks from the next frame, shifted by offsets
+estimated from local 3D DNA contrast. The left panel shows the selected
+mask's XY outline on the matching DNA acquisition. The right panel colors
+the front-visible surface of that mask.
 The fixed strip above the film highlights the current part of the story.
 Time-lapse scenes play the acquired frames in order with a fixed hold per
 frame. Paired DNA and mask panels advance together from the same acquisition.
