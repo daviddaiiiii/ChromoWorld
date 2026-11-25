@@ -20,9 +20,9 @@ const classes = [...Array.from({length:22},(_,i)=>String(i+1)), 'X', 'Y'];
       <StateMap map="fish" title="FISH" description="Fixed cells · probe-labeled preparations" />
       <StateMap id="chromophy" map="live" title="Live cells · ChromoPhy" description="Fig. 5E · ChromoID assignments in 3D" />
     </div>
-    <p class="scientific-note">Each UMAP is rotated to place Chr1 on the left and ChrY on the right. Colors identify chromosome classes. Lines join class centers in the order used in the paper.</p>
-    <StateMap id="aligned" map="overlay" title="Three states, aligned" description="All 24 class centers guide the rigid alignment to G-banding." />
-    <p class="scientific-note">The overlay uses rotation and translation in normalized plot coordinates. Distances within each map are preserved. Toggle a layer to compare the remaining two.</p>
+    <p class="scientific-note">Chr1 is on the left and ChrY on the right. The FISH map is flipped vertically. Lines connect the class centers in the order used in the paper.</p>
+    <StateMap id="aligned" map="overlay" title="Three states, aligned" description="G-banding, FISH and live cells share a reference defined by all 24 chromosome classes." />
+    <p class="scientific-note">Each state contributes equally to the mean position of each class. The fit rotates and translates each map toward those shared centers, preserving distances within each map.</p>
     <p class="map-readout" id="shape-note" aria-live="polite">Select a chromosome class to highlight its center in every view.</p>
   </section>
 </Base>

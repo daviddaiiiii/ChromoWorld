@@ -45,9 +45,12 @@ from the site directory to regenerate the UMAP clouds, normalized centroids and
 homepage preview. Fixed-cell maps use every saved Fig. 4 coordinate. The main
 live-cell map uses the Fig. 5E cloud and vector centroids exported by
 `prepare_intro_story.py`. The individual views rotate the Chr1-to-ChrY vector
-onto the positive horizontal axis. The overlay at `#aligned` fits one proper
-rotation and translation per state to the 24 G-banding class centroids, with
-equal weight per class. The fit uses the normalized square coordinates of the
+onto the positive horizontal axis and reflect FISH vertically in that view.
+The overlay at `#aligned` uses rigid generalized Procrustes registration.
+It alternates between fitting a proper rotation per centered map and averaging
+the three aligned positions of each of the 24 classes. Each state and class
+has equal weight. The shared orientation places the consensus Chr1 to the left
+of ChrY. The fit uses the normalized square coordinates of the
 three source plots. All layers share a single display zoom. Each cloud and its
 centroids use the same transform. Live assignments are inferred by ChromoID.
 

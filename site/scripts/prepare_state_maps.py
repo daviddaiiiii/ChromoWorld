@@ -56,21 +56,39 @@ def live_figure(story):
     return cloud, dict(zip(PAPER_ORDER,normalized.round(6).tolist()))
 
 
+def orient_chr1_to_y(points):
+    direction = points[-1] - points[0]  # CLASSES starts with Chr1 and ends with ChrY.
+    x, y = direction / np.linalg.norm(direction)
+    return np.array([[x, -y], [y, x]])
+
+
+def fit_consensus(centered):
+    """Rigid generalized Procrustes fit for equally weighted states and classes."""
+    consensus = centered.mean(axis=0)
+    for _ in range(200):
+        u, _, vt = np.linalg.svd(centered.transpose(0, 2, 1) @ consensus)
+        u[:, :, -1] *= np.sign(np.linalg.det(u @ vt))[:, None]
+        rotations = u @ vt
+        updated = (centered @ rotations).mean(axis=0)
+        if np.max(np.abs(updated - consensus)) < 1e-12:
+            # Remove the arbitrary common rotation for display.
+            return rotations @ orient_chr1_to_y(updated)
+        consensus = updated
+    raise RuntimeError("Three-state centroid registration did not converge")
+
+
 def display_maps(clouds, centers):
-    """Work in each original panel's unit square. Use row-vector rotations."""
-    rotated, overlay = {}, {}
-    for key, groups in centers.items():
-        vector = np.subtract(groups['Y'][:2], groups['1'][:2])
-        x, y = vector / np.linalg.norm(vector)
-        rotated[key] = np.array([[x, -y], [y, x]])
-    def points(key):
-        return np.array([centers[key][c][:2] for c in CLASSES])
-    target = points('banding') @ rotated['banding']
-    for key in centers:
-        src = points(key)
-        u, _, vt = np.linalg.svd((src-src.mean(0)).T @ (target-target.mean(0)))
-        rotation = u @ np.diag([1., np.sign(np.linalg.det(u @ vt))]) @ vt
-        overlay[key] = (rotation, target.mean(0) - src.mean(0) @ rotation)
+    """Work in each original panel's unit square. Use row-vector transforms."""
+    keys = list(centers)
+    points = np.array([[centers[k][c][:2] for c in CLASSES] for k in keys])
+    means = points.mean(axis=1, keepdims=True)
+    rotated = {k: orient_chr1_to_y(p) for k, p in zip(keys, points)}
+    # Mirror the entire FISH view across its horizontal Chr1-to-ChrY axis.
+    rotated['fish'] = rotated['fish'] @ np.diag([1., -1.])
+    orientation = np.array([rotated[k] for k in keys])
+    fitted = orientation @ fit_consensus((points - means) @ orientation)
+    offsets = -(means @ fitted)[:, 0, :]
+    overlay = dict(zip(keys, zip(fitted, offsets)))
 
     # Frame occupied pixels, not the empty corners of the square source images.
     bounds = {}
